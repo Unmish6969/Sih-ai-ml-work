@@ -17,6 +17,20 @@ class PredictionPoint(BaseModel):
     NO2_target: float = Field(..., description="Predicted NO2 concentration")
 
 
+class LiveSourceMetadata(BaseModel):
+    """Metadata about the live WAQI observation used for prediction."""
+    station_id: Optional[int] = Field(None, description="WAQI station identifier")
+    station_name: Optional[str] = Field(None, description="Station/showing location name")
+    station_location: Optional[List[float]] = Field(
+        None, description="Station latitude/longitude if provided by WAQI"
+    )
+    measurement_time: Optional[str] = Field(None, description="Original measurement timestamp from WAQI")
+    timezone: Optional[str] = Field(None, description="Timezone string provided by WAQI")
+    overall_aqi: Optional[float] = Field(None, description="Reported AQI at measurement time")
+    observed_no2: Optional[float] = Field(None, description="Observed NO2 concentration (µg/m³)")
+    observed_o3: Optional[float] = Field(None, description="Observed O3 concentration (µg/m³)")
+
+
 class PredictResponse(BaseModel):
     """Response model for prediction"""
     success: bool = Field(..., description="Whether prediction was successful")
@@ -24,6 +38,9 @@ class PredictResponse(BaseModel):
     forecast_hours: int = Field(..., description="Number of hours forecasted")
     predictions: List[PredictionPoint] = Field(..., description="List of predictions")
     message: Optional[str] = Field(None, description="Additional message")
+    live_source: Optional[LiveSourceMetadata] = Field(
+        None, description="Metadata about the live data source when applicable"
+    )
     
     class Config:
         schema_extra = {
@@ -41,7 +58,8 @@ class PredictResponse(BaseModel):
                         "NO2_target": 68.5
                     }
                 ],
-                "message": "Predictions generated successfully"
+                "message": "Predictions generated successfully",
+                "live_source": None
             }
         }
 

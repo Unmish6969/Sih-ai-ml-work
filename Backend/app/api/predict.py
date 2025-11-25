@@ -8,16 +8,83 @@ import pandas as pd
 import logging
 
 from app.schemas.predict_request import PredictRequest
-from app.schemas.predict_response import PredictResponse, ErrorResponse
+from app.schemas.predict_response import PredictResponse, ErrorResponse, LiveSourceMetadata
 from app.services.prediction_service import PredictionService
+from app.services.live_data_service import LiveDataService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/predict", tags=["predictions"])
 
-# Initialize prediction service
-# Path will be resolved relative to backend root
+# Initialize services (paths resolved relative to backend root)
 prediction_service = PredictionService(models_dir="Data_SIH_2025/models")
+live_data_service = LiveDataService(lat_lon_path="Data_SIH_2025/lat_lon_sites.txt")
+
+
+@router.get(
+    "/site/{site_id}/live",
+    response_model=PredictResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Live prediction using WAQI data",
+    description="Fetch live WAQI measurements for a site and run the site-specific model"
+)
+async def predict_live_site(site_id: int):
+    """
+    Fetch live WAQI measurements for the given site and run the model with those features.
+    Only a single-hour prediction is returned because WAQI exposes the current observation.
+    """
+    try:
+        if not 1 <= site_id <= 7:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Site ID must be between 1 and 7, got {site_id}"
+            )
+
+        live_payload = live_data_service.get_site_features(site_id)
+        features = live_payload["features"]
+        metadata = live_payload["metadata"]
+
+        predictions = prediction_service.predict_from_dict(
+            input_data=[features],
+            site_id=site_id,
+            forecast_hours=1
+        )
+
+        live_source = LiveSourceMetadata(
+            station_id=metadata.get("station_id"),
+            station_name=metadata.get("station_name"),
+            station_location=metadata.get("station_location"),
+            measurement_time=metadata.get("measurement_time"),
+            timezone=metadata.get("timezone"),
+            overall_aqi=metadata.get("overall_aqi"),
+            observed_no2=metadata.get("observed_no2"),
+            observed_o3=metadata.get("observed_o3"),
+        )
+
+        station_name = metadata.get("station_name", "WAQI station")
+        return PredictResponse(
+            success=True,
+            site_id=site_id,
+            forecast_hours=1,
+            predictions=predictions,
+            message=f"Live prediction generated using {station_name}",
+            live_source=live_source
+        )
+
+    except HTTPException:
+        raise
+    except FileNotFoundError as e:
+        logger.error(f"Model file not found: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model for site {site_id} not found. Please ensure models are trained and available."
+        )
+    except Exception as e:
+        logger.error(f"Error generating live prediction: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating live prediction: {str(e)}"
+        )
 
 
 @router.post(
