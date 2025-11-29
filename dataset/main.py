@@ -19,7 +19,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 START_YEAR = 2019
 END_YEAR = 2024
 # 1-based index of the site to process (set to 4 to only download site 4)
-SITE_TO_PROCESS = 6
+SITE_TO_PROCESS = 1
 
 DELTA_DEGREES = 0.05
 MAX_RETRIES = 5
