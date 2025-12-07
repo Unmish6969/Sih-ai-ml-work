@@ -5,9 +5,10 @@ import {
   HealthResponse,
   ModelHealthResponse,
   ModelDetailResponse,
+  MetricsResponse,
 } from "@shared/api";
 
-const API_BASE_URL = "https://apiexample.com";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 interface ApiError {
   message: string;
@@ -31,23 +32,39 @@ class ApiClient {
         ...options,
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
           ...options.headers,
         },
       });
 
       if (!response.ok) {
+        let errorMessage = `API Error: ${response.statusText} (${response.status})`;
+        try {
+          const errorData = await response.json();
+          if (errorData.detail || errorData.message) {
+            errorMessage = errorData.detail || errorData.message;
+          }
+        } catch {
+          // If response is not JSON, use the status text
+        }
         throw {
-          message: `API Error: ${response.statusText}`,
+          message: errorMessage,
           status: response.status,
         } as ApiError;
       }
 
       return await response.json();
     } catch (error) {
-      if (error instanceof Error) {
-        throw { message: error.message } as ApiError;
+      if (error && typeof error === 'object' && 'message' in error) {
+        throw error;
       }
-      throw error;
+      if (error instanceof Error) {
+        // Network errors, CORS errors, etc.
+        throw {
+          message: `Network error: ${error.message}. Make sure the backend server is running on ${this.baseUrl}`
+        } as ApiError;
+      }
+      throw { message: 'Unknown error occurred' } as ApiError;
     }
   }
 
@@ -110,6 +127,13 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(request),
     });
+  }
+
+  /**
+   * Get model evaluation metrics
+   */
+  async getMetrics(): Promise<MetricsResponse> {
+    return this.request("/api/v1/predict/metrics");
   }
 }
 

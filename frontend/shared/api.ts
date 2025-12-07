@@ -17,7 +17,7 @@ export interface DemoResponse {
 
 export interface PredictInput {
   year: number;
-  month: number; 
+  month: number;
   day: number;
   hour: number;
   O3_forecast: number;
@@ -101,4 +101,25 @@ export interface ModelDetailResponse {
   model_name: string;
   features: string[];
   message: string;
+}
+
+export interface PollutantMetrics {
+  rmse: number;
+  mae: number;
+  bias: number;
+  r2: number;
+  ria: number;
+  baseline_rmse: number;
+  rmse_reduction_pct: number;
+}
+
+export interface SiteMetrics {
+  site_id: number;
+  o3: PollutantMetrics;
+  no2: PollutantMetrics;
+}
+
+export interface MetricsResponse {
+  generated_at: string;
+  sites: SiteMetrics[];
 }
