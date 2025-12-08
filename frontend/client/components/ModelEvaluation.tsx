@@ -507,7 +507,7 @@ const ModelEvaluation = () => {
             <XAxis dataKey="date" stroke={theme === 'dark' ? '#94a3b8' : '#64748b'} />
             <YAxis 
               stroke={theme === 'dark' ? '#94a3b8' : '#64748b'} 
-              domain={selectedMetric === 'R2' ? [0, 1] : 'auto'}
+              domain={selectedMetric === 'R2' ? [0, 1] : ['auto', 'auto']}
               label={{ 
                 value: selectedMetric === 'R2' ? 'Score' : `${metrics.unit}`, 
                 angle: -90, 

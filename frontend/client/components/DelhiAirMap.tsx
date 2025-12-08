@@ -224,16 +224,18 @@ export default function DelhiAirMap({ sites, onRefresh }: DelhiAirMapProps) {
 
               <div className="relative h-[420px] w-full">
                 <MapContainer
-                  center={center}
-                  zoom={11}
-                  minZoom={9}
-                  maxZoom={16}
-                  maxBounds={bounds}
-                  maxBoundsViscosity={1.0}
-                  scrollWheelZoom
-                  className="h-full w-full"
+                  {...({
+                    center: center as [number, number],
+                    zoom: 11,
+                    minZoom: 9,
+                    maxZoom: 16,
+                    maxBounds: bounds,
+                    maxBoundsViscosity: 1.0,
+                    scrollWheelZoom: true,
+                    className: 'h-full w-full',
+                  } as any)}
                 >
-                  <TileLayer attribution='&copy; OpenStreetMap' url={tileUrl} />
+                  <TileLayer {...({ attribution: '&copy; OpenStreetMap', url: tileUrl } as any)} />
                   <FitBounds sites={data} />
                   <HeatLayer points={heatPoints} gradient={gradient} />
 
