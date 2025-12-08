@@ -1,0 +1,82 @@
+{
+  "site_id": 2,
+  "timestamp": "20251209_010653",
+  "n_features": 28,
+  "features": [
+    "O3_forecast",
+    "NO2_forecast",
+    "T_forecast",
+    "q_forecast",
+    "u_forecast",
+    "v_forecast",
+    "w_forecast",
+    "blh_forecast",
+    "ratio_satellite",
+    "NO2_satellite_filled",
+    "HCHO_satellite_filled",
+    "NO2_forecast_per_blh",
+    "O3_forecast_per_blh",
+    "blh_delta_1h",
+    "blh_rel_change",
+    "sin_hour",
+    "cos_hour",
+    "wind_speed",
+    "wind_dir_deg",
+    "wind_sector",
+    "SZA_deg",
+    "cosSZA",
+    "solar_elevation",
+    "sunset_flag",
+    "solar_declination_deg",
+    "hour_angle_deg",
+    "solar_time_hr",
+    "EoT_min"
+  ],
+  "O3_metrics": {
+    "train_rmse": 4.651983988597447,
+    "train_mae": 3.2174222463944724,
+    "train_r2": 0.9759794424737832,
+    "val_rmse": 14.055186109425726,
+    "val_mae": 9.021385904864147,
+    "val_r2": 0.7893345429565881
+  },
+  "NO2_metrics": {
+    "train_rmse": 4.156549733208325,
+    "train_mae": 2.993369420300609,
+    "train_r2": 0.9712308248037664,
+    "val_rmse": 10.915255796825585,
+    "val_mae": 7.614551063442304,
+    "val_r2": 0.7935815182221102
+  },
+  "model_type": "XGBoost",
+  "hyperparameters": {
+    "O3": {
+      "objective": "reg:squarederror",
+      "n_estimators": 500,
+      "max_depth": 8,
+      "learning_rate": 0.05,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "min_child_weight": 3,
+      "gamma": 0.1,
+      "reg_alpha": 0.1,
+      "reg_lambda": 1.0,
+      "random_state": 42,
+      "n_jobs": -1
+    },
+    "NO2": {
+      "objective": "reg:squarederror",
+      "n_estimators": 500,
+      "max_depth": 8,
+      "learning_rate": 0.05,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "min_child_weight": 3,
+      "gamma": 0.1,
+      "reg_alpha": 0.1,
+      "reg_lambda": 1.0,
+      "random_state": 42,
+      "n_jobs": -1
+    }
+  }
+}
