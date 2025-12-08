@@ -15,7 +15,8 @@ from stacking import EnsembleModel
 
 def train_ensemble(site_id: int, target: str = 'NO2', data_dir: str = 'F',
                    use_cv: bool = True, n_splits: int = 5,
-                   use_optuna: bool = False, save_model: bool = True):
+                   use_optuna: bool = False, save_model: bool = True,
+                   quick_mode: bool = False):
     """
     Train ensemble model for a given site and target.
     
@@ -27,6 +28,7 @@ def train_ensemble(site_id: int, target: str = 'NO2', data_dir: str = 'F',
         n_splits: Number of CV splits
         use_optuna: Whether to use Optuna for LightGBM hyperparameter tuning
         save_model: Whether to save the trained model
+        quick_mode: If True, use fewer trials (10) and folds (3) for faster testing
     """
     print(f"\n{'='*60}")
     print(f"Training Ensemble Model for Site {site_id}, Target: {target}")
@@ -257,8 +259,9 @@ def main():
             target=args.target,
             data_dir=args.data_dir,
             use_cv=not args.no_cv,
-            n_splits=args.n_splits,
-            use_optuna=args.use_optuna
+            n_splits=3 if args.quick else args.n_splits,  # Quick mode: 3 folds
+            use_optuna=args.use_optuna,
+            quick_mode=args.quick
         )
 
 
