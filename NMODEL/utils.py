@@ -56,6 +56,15 @@ def prepare_features(df: pd.DataFrame, target: str = 'NO2') -> Tuple[pd.DataFram
     # Exclude target columns and metadata
     exclude_cols = ['datetime', 'NO2_target', 'O3_target', '_original_row_marker']
     
+    # Drop redundant satellite columns (use filled_broadcast versions instead)
+    # These original columns may have NaN, while filled_broadcast versions are already filled
+    redundant_satellite_cols = [
+        'NO2_satellite_daily',      # Use NO2_satellite_daily_filled_broadcast instead
+        'HCHO_satellite_daily',      # Use HCHO_satellite_daily_filled_broadcast instead
+        'ratio_satellite_daily',     # Use ratio_satellite_daily_filled_broadcast instead
+        'NO2_satellite_delta'        # This one doesn't have a filled version, but has NaN issues
+    ]
+    
     # Get target column
     target_col = f'{target}_target'
     
@@ -65,13 +74,46 @@ def prepare_features(df: pd.DataFrame, target: str = 'NO2') -> Tuple[pd.DataFram
     else:
         sample_weights = pd.Series(1.0, index=df.index)
     
-    # Get feature columns
-    feature_cols = [col for col in df.columns if col not in exclude_cols]
+    # Get feature columns (exclude redundant satellite columns)
+    feature_cols = [col for col in df.columns if col not in exclude_cols and col not in redundant_satellite_cols]
+    
+    # Log which columns were dropped (if they exist)
+    dropped_cols = [col for col in redundant_satellite_cols if col in df.columns]
+    if dropped_cols:
+        print(f"  Dropped {len(dropped_cols)} redundant satellite columns: {', '.join(dropped_cols)}")
+        print(f"  Using filled_broadcast versions instead (if available)")
+    
     X = df[feature_cols].copy()
     y = df[target_col].copy()
     
     # Handle missing values in features (fill with median)
     X = X.fillna(X.median())
+    
+    # Handle missing values in target (fill with median, or drop if too many)
+    nan_count = y.isna().sum()
+    if nan_count > 0:
+        if nan_count / len(y) > 0.1:  # If more than 10% are NaN, drop rows
+            print(f"Warning: {nan_count} ({nan_count/len(y)*100:.1f}%) NaN values in target {target_col}, dropping rows")
+            valid_mask = ~y.isna()
+            X = X[valid_mask].copy()
+            y = y[valid_mask].copy()
+            sample_weights = sample_weights[valid_mask].copy()
+        else:
+            # Fill NaN with median of target
+            y_median = y.median()
+            if pd.isna(y_median):
+                # If all values are NaN, use 0.0
+                print(f"Warning: All target values are NaN for {target_col}, filling with 0.0")
+                y = y.fillna(0.0)
+            else:
+                print(f"Warning: {nan_count} NaN values in target {target_col}, filling with median ({y_median:.2f})")
+                y = y.fillna(y_median)
+    
+    # Final check: ensure no NaN remains
+    if y.isna().any():
+        raise ValueError(f"Target {target_col} still contains NaN values after cleaning")
+    if X.isna().any().any():
+        raise ValueError("Features still contain NaN values after cleaning")
     
     return X, y, sample_weights
 
@@ -80,27 +122,61 @@ def time_series_cv_splits(df: pd.DataFrame, n_splits: int = 5, test_size: Option
     """
     Generate time-series cross-validation splits (expanding window).
     
+    Returns list of (train_idx, val_idx) where indices are ints for df (0..n-1).
+    Uses expanding window: each fold's training set grows, validation blocks are equal-sized.
+    Ensures ALL samples are covered in at least one validation set.
+    
     Args:
         df: Dataframe with datetime index
         n_splits: Number of CV splits
-        test_size: Size of test set for each split (default: len(df) // (n_splits + 1))
+        test_size: Size of validation block for each split (default: calculated to cover all samples)
         
     Returns:
-        List of (train_idx, val_idx) tuples
+        List of (train_idx, val_idx) tuples where indices are numpy arrays
     """
     n = len(df)
+    if n <= 0:
+        return []
+    
     if test_size is None:
-        test_size = n // (n_splits + 1)
+        # Reserve minimum training size (at least 1% of data, minimum 10 samples)
+        min_train_size = max(10, n // 100)
+        remaining = n - min_train_size
+        # Divide remaining samples into n_splits validation blocks
+        test_size = max(1, remaining // n_splits)
+        remainder = remaining % n_splits  # Distribute remainder to last folds
     
     splits = []
-    for i in range(1, n_splits + 1):
-        train_end = n - test_size * (n_splits - i + 1)
-        val_start = train_end
-        val_end = val_start + test_size
+    min_train_size = max(10, n // 100)
+    
+    # Create n_splits folds with expanding window that covers ALL samples
+    # Strategy: start with min_train_size, then divide remaining into validation blocks
+    for i in range(n_splits):
+        # Calculate validation block start (after minimum training size)
+        val_start = min_train_size + test_size * i + (i if i < remainder else remainder)
+        # Calculate validation block size (add 1 to first 'remainder' folds)
+        block_size = test_size + (1 if i < remainder else 0)
+        val_end = val_start + block_size
         
-        if train_end > 0 and val_end <= n:
-            train_idx = np.arange(0, train_end)
-            val_idx = np.arange(val_start, val_end)
+        # For the last fold, ensure we cover all remaining samples
+        if i == n_splits - 1:
+            val_end = n
+        
+        # Ensure we don't exceed bounds
+        if val_start >= n:
+            break
+        val_end = min(val_end, n)
+        if val_end <= val_start:
+            continue
+        
+        # Training set: all samples before validation start (expanding window)
+        train_end = val_start
+        
+        train_idx = np.arange(0, train_end)
+        val_idx = np.arange(val_start, val_end)
+        
+        # Only add split if both training and validation have samples
+        if len(train_idx) > 0 and len(val_idx) > 0:
             splits.append((train_idx, val_idx))
     
     return splits

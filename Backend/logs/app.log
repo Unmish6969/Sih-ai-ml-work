@@ -1069,3 +1069,15 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.waqi.info', p
 2025-12-08 03:16:22 - app.main - INFO - Successfully pre-loaded 8 model(s)
 2025-12-08 03:16:26 - app.api.predict - WARNING - No data found for the last 30 days from TODAY 2025-12-08. CSV data may be older than the requested date range.
 2025-12-08 03:16:48 - app.api.predict - WARNING - No data found for the last 30 days from TODAY 2025-12-08. CSV data may be older than the requested date range.
+2025-12-08 17:40:42 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-08 17:40:42 - app.main - INFO - Loading models...
+2025-12-08 17:40:42 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-08 17:40:47 - app.main - INFO - Loaded model for site 1
+2025-12-08 17:40:47 - app.main - INFO - Loaded model for site 2
+2025-12-08 17:40:47 - app.main - INFO - Loaded model for site 3
+2025-12-08 17:40:47 - app.main - INFO - Loaded model for site 4
+2025-12-08 17:40:47 - app.main - INFO - Loaded model for site 5
+2025-12-08 17:40:47 - app.main - INFO - Loaded model for site 6
+2025-12-08 17:40:47 - app.main - INFO - Loaded model for site 7
+2025-12-08 17:40:47 - app.main - INFO - Loaded unified model
+2025-12-08 17:40:47 - app.main - INFO - Successfully pre-loaded 8 model(s)

@@ -66,94 +66,88 @@ class TimeSeriesDataset(Dataset):
         return max(0, self.n_samples)
     
     def __getitem__(self, idx):
-        end_idx = idx + self.input_window
+        """
+        Get a sample from the dataset.
         
-        # Input sequence - always use exactly input_window samples
-        # Handle three cases:
-        # 1. Normal case: idx to end_idx is within bounds
-        # 2. end_idx exceeds array: pad from beginning
-        # 3. idx is near end: pad from beginning
+        Returns:
+            X_seq: (input_window, n_features) - input sequence
+            y_seq: (input_window,) - historical target sequence
+            y_target: (output_horizon,) - target to predict
+            static: static features
+            known_future: (output_horizon, n_known_features) - known future covariates
+            weight: sample weight
+        """
+        # Compute start/end indices for input window
+        start_idx = idx
+        end_idx = idx + self.input_window  # exclusive
         
-        # Calculate how many samples we can actually get from idx to end
-        available_samples = len(self.X) - idx
-        
-        if available_samples >= self.input_window:
-            # Normal case: we have enough samples
-            X_seq = self.X[idx:idx + self.input_window].copy()
-            y_seq = self.y[idx:idx + self.input_window].copy()
-            actual_end = idx + self.input_window
+        # Input sequence - always return exactly input_window samples
+        if end_idx <= len(self.X):
+            # Normal case: enough data available
+            X_seq = self.X[start_idx:end_idx].copy()
+            y_seq = self.y[start_idx:end_idx].copy()
         else:
-            # Not enough samples - pad from the beginning
-            # Get what we can from idx to end of array
-            if idx < len(self.X):
-                X_available = self.X[idx:].copy()
-                y_available = self.y[idx:].copy()
-            else:
-                # idx is beyond array bounds - all zeros
-                X_available = np.zeros((0, self.X.shape[1]))
-                y_available = np.zeros(0)
+            # Not enough data - pad with zeros at the beginning
+            available = self.X[start_idx:len(self.X)].copy()
+            y_available = self.y[start_idx:len(self.y)].copy()
+            pad_size = end_idx - len(self.X)
             
-            pad_size = self.input_window - len(X_available)
+            # Pad with zeros matching the dtype and shape
+            X_pad = np.zeros((pad_size, self.X.shape[1]), dtype=self.X.dtype)
+            y_pad = np.zeros(pad_size, dtype=self.y.dtype)
             
-            # Pad with zeros at the beginning
-            if pad_size > 0:
-                X_seq = np.vstack([np.zeros((pad_size, self.X.shape[1])), X_available])
-                y_seq = np.concatenate([np.zeros(pad_size), y_available])
-            else:
-                X_seq = X_available
-                y_seq = y_available
-            
-            actual_end = len(self.y)
+            X_seq = np.vstack([X_pad, available])
+            y_seq = np.concatenate([y_pad, y_available])
         
-        # Final safety check: ALWAYS ensure we have exactly input_window samples
-        # This is critical for batching - all sequences must be the same length
-        if len(X_seq) < self.input_window:
-            pad_size = self.input_window - len(X_seq)
-            X_seq = np.vstack([np.zeros((pad_size, X_seq.shape[1])), X_seq])
-            y_seq = np.concatenate([np.zeros(pad_size), y_seq])
-        elif len(X_seq) > self.input_window:
-            X_seq = X_seq[:self.input_window]
-            y_seq = y_seq[:self.input_window]
+        # Ensure exactly input_window samples (safety check)
+        if len(X_seq) != self.input_window:
+            raise ValueError(f"X_seq length {len(X_seq)} != input_window {self.input_window}")
+        if len(y_seq) != self.input_window:
+            raise ValueError(f"y_seq length {len(y_seq)} != input_window {self.input_window}")
         
-        # Final verification (should always pass after safety check)
-        if len(X_seq) != self.input_window or len(y_seq) != self.input_window:
-            raise ValueError(
-                f"Failed to create sequence of length {self.input_window}: "
-                f"X_seq={len(X_seq)}, y_seq={len(y_seq)}, idx={idx}, "
-                f"available={available_samples}, X_len={len(self.X)}"
-            )
+        # Target: prediction target starts at end_idx and spans output_horizon
+        target_start = end_idx
+        target_end = target_start + self.output_horizon
         
-        target_start = actual_end
-        target_end = min(target_start + self.output_horizon, len(self.y))
-        
-        # Target (for single-step prediction, we predict the next value)
-        # For multi-horizon, we predict the next output_horizon values
-        if self.output_horizon == 1:
-            # For single-step, we need actual_end to be a valid index (not equal to len)
-            if actual_end < len(self.y):
-                y_target = np.array([self.y[actual_end]])  # Ensure it's an array
-            else:
-                # This shouldn't happen if n_samples is correct, but handle gracefully
-                # Use last value if we're at the end
-                y_target = np.array([self.y[-1]] if len(self.y) > 0 else [0.0])
+        # Target: extract target values for prediction
+        if target_end <= len(self.y):
+            # Normal case: enough target data available
+            y_target = self.y[target_start:target_end].copy()
         else:
+            # Not enough target data - pad with last value (or zeros)
             if target_start < len(self.y):
-                y_target = self.y[target_start:target_end]
-                if isinstance(y_target, (int, float, np.integer, np.floating)):
-                    y_target = np.array([y_target])
+                available = self.y[target_start:len(self.y)].copy()
+                pad_size = target_end - len(self.y)
+                # Pad with last available value (or zero if no data)
+                pad_value = self.y[-1] if len(self.y) > 0 else 0.0
+                y_pad = np.full(pad_size, pad_value, dtype=self.y.dtype)
+                y_target = np.concatenate([available, y_pad])
             else:
-                # Use last value(s) if we're at the end
-                y_target = np.array([self.y[-1]] * self.output_horizon)
+                # No target data available - use zeros
+                y_target = np.zeros(self.output_horizon, dtype=self.y.dtype)
         
-        # Static features (use the last value in the sequence)
+        # Ensure exactly output_horizon target values
+        if len(y_target) != self.output_horizon:
+            # Truncate or pad to match output_horizon
+            if len(y_target) < self.output_horizon:
+                pad_size = self.output_horizon - len(y_target)
+                pad_value = y_target[-1] if len(y_target) > 0 else 0.0
+                y_pad = np.full(pad_size, pad_value, dtype=y_target.dtype)
+                y_target = np.concatenate([y_target, y_pad])
+            else:
+                y_target = y_target[:self.output_horizon]
+        
+        # Static features (use the value at end_idx - 1, or last available)
         if self.static_features is not None:
-            # Use the last available index for static features
-            static_idx = min(actual_end - 1, len(self.static_features) - 1) if actual_end > 0 else 0
+            static_idx = min(end_idx - 1, len(self.static_features) - 1) if end_idx > 0 else 0
             static = self.static_features[static_idx]
+            # Ensure it's a 1D array
             if isinstance(static, (int, float, np.integer, np.floating)):
                 static = np.array([static])
             elif len(static.shape) == 0:
                 static = np.array([static])
+            elif len(static.shape) > 1:
+                static = static.flatten()
         else:
             static = np.array([])
         
@@ -185,9 +179,9 @@ class TimeSeriesDataset(Dataset):
             # No known future features - return zeros with shape (output_horizon, 0)
             known = np.zeros((self.output_horizon, 0))
         
-        # Sample weight (safe indexing)
+        # Sample weight (safe indexing - use end_idx - 1)
         if self.sample_weights is not None:
-            weight_idx = min(actual_end - 1, len(self.sample_weights) - 1) if actual_end > 0 else 0
+            weight_idx = min(end_idx - 1, len(self.sample_weights) - 1) if end_idx > 0 else 0
             weight = self.sample_weights[weight_idx]
         else:
             weight = 1.0
@@ -248,9 +242,6 @@ class TemporalFusionTransformer(nn.Module):
         # Historical target embedding (fix: define in __init__, not in forward)
         self.y_embed = nn.Linear(1, hidden_size)
         
-        # Initialize weights to prevent NaN
-        self._initialize_weights()
-        
         # LSTM encoder
         self.lstm = nn.LSTM(
             hidden_size, hidden_size, 
@@ -292,17 +283,17 @@ class TemporalFusionTransformer(nn.Module):
         """Initialize weights to prevent NaN/Inf issues."""
         for module in self.modules():
             if isinstance(module, nn.Linear):
-                # Xavier uniform initialization with small gain
-                nn.init.xavier_uniform_(module.weight, gain=0.1)
+                # Xavier uniform initialization with moderate gain (0.1 was too small)
+                nn.init.xavier_uniform_(module.weight, gain=0.5)
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0.0)
             elif isinstance(module, nn.LSTM):
                 # Initialize LSTM weights
                 for name, param in module.named_parameters():
                     if 'weight_ih' in name:
-                        nn.init.xavier_uniform_(param.data, gain=0.1)
+                        nn.init.xavier_uniform_(param.data, gain=0.5)
                     elif 'weight_hh' in name:
-                        nn.init.orthogonal_(param.data, gain=0.1)
+                        nn.init.orthogonal_(param.data, gain=0.5)
                     elif 'bias' in name:
                         nn.init.constant_(param.data, 0.0)
                         # Set forget gate bias to 1 (helps with gradient flow)
@@ -325,45 +316,95 @@ class TemporalFusionTransformer(nn.Module):
         """
         batch_size = X.size(0)
         
+        # Validate inputs for NaN/Inf
+        if torch.any(torch.isnan(X)) or torch.any(torch.isinf(X)):
+            raise ValueError("Input X contains NaN/Inf values")
+        if torch.any(torch.isnan(y_history)) or torch.any(torch.isinf(y_history)):
+            raise ValueError("Input y_history contains NaN/Inf values")
+        
         # Embed input features
         X_emb = self.input_embedding(X)  # (batch, seq_len, hidden_size)
         X_emb = self.dropout(X_emb)
         
+        # Check for NaN after embedding
+        if torch.any(torch.isnan(X_emb)) or torch.any(torch.isinf(X_emb)):
+            raise ValueError("X_emb contains NaN/Inf after embedding")
+        
         # Add historical target as additional feature (fix: use self.y_embed defined in __init__)
         y_emb = y_history.unsqueeze(-1)  # (batch, seq_len, 1)
         y_emb = self.y_embed(y_emb)  # (batch, seq_len, hidden_size)
+        
+        # Check for NaN after y embedding
+        if torch.any(torch.isnan(y_emb)) or torch.any(torch.isinf(y_emb)):
+            raise ValueError("y_emb contains NaN/Inf after embedding")
+        
         X_emb = X_emb + y_emb
+        
+        # Check for NaN after addition
+        if torch.any(torch.isnan(X_emb)) or torch.any(torch.isinf(X_emb)):
+            raise ValueError("X_emb contains NaN/Inf after adding y_emb")
         
         # LSTM encoding
         lstm_out, (h_n, c_n) = self.lstm(X_emb)
+        
+        # Check for NaN after LSTM
+        if torch.any(torch.isnan(lstm_out)) or torch.any(torch.isinf(lstm_out)):
+            raise ValueError("lstm_out contains NaN/Inf after LSTM")
         
         # Use last hidden state
         last_hidden = lstm_out[:, -1, :]  # (batch, hidden_size)
         
         # Multi-head attention on sequence
         attn_out, _ = self.attention(lstm_out, lstm_out, lstm_out)
+        
+        # Check for NaN after attention
+        if torch.any(torch.isnan(attn_out)) or torch.any(torch.isinf(attn_out)):
+            raise ValueError("attn_out contains NaN/Inf after attention")
+        
         attn_last = attn_out[:, -1, :]  # (batch, hidden_size)
         
         # Combine LSTM and attention outputs
         combined = torch.cat([last_hidden, attn_last], dim=1)  # (batch, hidden_size * 2)
         
+        # Check for NaN after combining
+        if torch.any(torch.isnan(combined)) or torch.any(torch.isinf(combined)):
+            raise ValueError("combined contains NaN/Inf after concatenation")
+        
         # Add static features if available
         if static is not None and self.static_size > 0:
+            if torch.any(torch.isnan(static)) or torch.any(torch.isinf(static)):
+                raise ValueError("static features contain NaN/Inf")
             static_emb = self.static_encoder(static)  # (batch, hidden_size)
+            if torch.any(torch.isnan(static_emb)) or torch.any(torch.isinf(static_emb)):
+                raise ValueError("static_emb contains NaN/Inf after encoding")
             # Expand static_emb to match combined size and concatenate
             static_expanded = torch.cat([static_emb, static_emb], dim=1)  # (batch, hidden_size * 2)
             combined = combined + static_expanded
+            if torch.any(torch.isnan(combined)) or torch.any(torch.isinf(combined)):
+                raise ValueError("combined contains NaN/Inf after adding static")
         
         # Add known future features if available
         if known_future is not None and self.known_future_size > 0:
+            if torch.any(torch.isnan(known_future)) or torch.any(torch.isinf(known_future)):
+                raise ValueError("known_future features contain NaN/Inf")
             known_emb = self.known_future_encoder(known_future)  # (batch, output_horizon, hidden_size)
+            if torch.any(torch.isnan(known_emb)) or torch.any(torch.isinf(known_emb)):
+                raise ValueError("known_emb contains NaN/Inf after encoding")
             # Average over horizon and expand to match combined size
             known_avg = known_emb.mean(dim=1)  # (batch, hidden_size)
+            if torch.any(torch.isnan(known_avg)) or torch.any(torch.isinf(known_avg)):
+                raise ValueError("known_avg contains NaN/Inf after averaging")
             known_expanded = torch.cat([known_avg, known_avg], dim=1)  # (batch, hidden_size * 2)
             combined = combined + known_expanded
+            if torch.any(torch.isnan(combined)) or torch.any(torch.isinf(combined)):
+                raise ValueError("combined contains NaN/Inf after adding known_future")
         
         # Output prediction
         output = self.output_layer(combined)  # (batch, output_horizon)
+        
+        # Final check
+        if torch.any(torch.isnan(output)) or torch.any(torch.isinf(output)):
+            raise ValueError("output contains NaN/Inf after output layer")
         
         return output
 
@@ -422,6 +463,16 @@ class TFTModel:
                      sample_weights: Optional[pd.Series] = None,
                      fit_scalers: bool = False) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
         """Prepare and scale data."""
+        # Validate input data for NaN/Inf
+        if X.isna().any().any():
+            raise ValueError("Input features X contain NaN values")
+        if np.isinf(X.values).any():
+            raise ValueError("Input features X contain Inf values")
+        if y.isna().any():
+            raise ValueError("Target y contains NaN values")
+        if np.isinf(y.values).any():
+            raise ValueError("Target y contains Inf values")
+        
         # Scale features
         if fit_scalers:
             X_scaled = self.scaler_X.fit_transform(X.values)
@@ -430,21 +481,47 @@ class TFTModel:
             X_scaled = self.scaler_X.transform(X.values)
             y_scaled = self.scaler_y.transform(y.values.reshape(-1, 1)).flatten()
         
+        # Check for NaN/Inf after scaling
+        if np.any(np.isnan(X_scaled)) or np.any(np.isinf(X_scaled)):
+            raise ValueError("Scaled features X_scaled contain NaN/Inf values")
+        if np.any(np.isnan(y_scaled)) or np.any(np.isinf(y_scaled)):
+            raise ValueError("Scaled target y_scaled contains NaN/Inf values")
+        
         # Scale static features
         static_scaled = None
         if static_features is not None and len(static_features.columns) > 0:
+            # Validate static features
+            if static_features.isna().any().any():
+                raise ValueError("Static features contain NaN values")
+            if np.isinf(static_features.values).any():
+                raise ValueError("Static features contain Inf values")
+            
             if fit_scalers:
                 static_scaled = self.static_scaler.fit_transform(static_features.values)
             else:
                 static_scaled = self.static_scaler.transform(static_features.values)
+            
+            # Check for NaN/Inf after scaling
+            if np.any(np.isnan(static_scaled)) or np.any(np.isinf(static_scaled)):
+                raise ValueError("Scaled static features contain NaN/Inf values")
         
         # Scale known future features
         known_scaled = None
         if known_future is not None and len(known_future.columns) > 0:
+            # Validate known future features
+            if known_future.isna().any().any():
+                raise ValueError("Known future features contain NaN values")
+            if np.isinf(known_future.values).any():
+                raise ValueError("Known future features contain Inf values")
+            
             if fit_scalers:
                 known_scaled = self.known_future_scaler.fit_transform(known_future.values)
             else:
                 known_scaled = self.known_future_scaler.transform(known_future.values)
+            
+            # Check for NaN/Inf after scaling
+            if np.any(np.isnan(known_scaled)) or np.any(np.isinf(known_scaled)):
+                raise ValueError("Scaled known future features contain NaN/Inf values")
         
         # Sample weights
         weights = sample_weights.values if sample_weights is not None else None

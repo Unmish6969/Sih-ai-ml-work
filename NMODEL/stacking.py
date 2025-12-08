@@ -53,8 +53,27 @@ class StackingEnsemble:
         Returns:
             Self
         """
+        # Handle NaN values in OOF predictions (replace with fallback or mean)
+        # This can happen if TFT training fails or produces NaN predictions
+        oof_predictions_clean = {}
+        for model_name, preds in oof_predictions.items():
+            preds_clean = preds.copy()
+            nan_mask = np.isnan(preds_clean)
+            if np.any(nan_mask):
+                nan_count = np.sum(nan_mask)
+                print(f"Warning: {nan_count} NaN values found in {model_name} OOF predictions, replacing with mean")
+                # Replace NaN with mean of non-NaN values
+                mean_val = np.nanmean(preds_clean)
+                preds_clean[nan_mask] = mean_val if not np.isnan(mean_val) else 0.0
+            oof_predictions_clean[model_name] = preds_clean
+        
         # Prepare meta-features from OOF predictions
-        meta_X = np.column_stack([preds for preds in oof_predictions.values()])
+        meta_X = np.column_stack([preds for preds in oof_predictions_clean.values()])
+        
+        # Final check: ensure no NaN in meta_X
+        if np.any(np.isnan(meta_X)):
+            print("Warning: NaN values still present in meta_X after cleaning, replacing with 0")
+            meta_X = np.nan_to_num(meta_X, nan=0.0)
         
         # Fit meta-learner
         if self.meta_model_type == 'ridge':
@@ -63,13 +82,28 @@ class StackingEnsemble:
             
             # Tune alpha on validation set if provided
             if val_predictions is not None and y_val is not None:
+                # Handle NaN in validation predictions
+                val_predictions_clean = {}
+                for model_name, preds in val_predictions.items():
+                    preds_clean = preds.copy()
+                    nan_mask = np.isnan(preds_clean)
+                    if np.any(nan_mask):
+                        nan_count = np.sum(nan_mask)
+                        print(f"Warning: {nan_count} NaN values found in {model_name} validation predictions, replacing with mean")
+                        mean_val = np.nanmean(preds_clean)
+                        preds_clean[nan_mask] = mean_val if not np.isnan(mean_val) else 0.0
+                    val_predictions_clean[model_name] = preds_clean
+                
                 best_alpha = self.ridge_alpha
                 best_score = float('inf')
                 
                 for alpha in [0.1, 0.5, 1.0, 2.0, 5.0, 10.0]:
                     temp_model = Ridge(alpha=alpha)
                     temp_model.fit(meta_X, y_true)
-                    val_meta_X = np.column_stack([preds for preds in val_predictions.values()])
+                    val_meta_X = np.column_stack([preds for preds in val_predictions_clean.values()])
+                    # Final check for NaN
+                    if np.any(np.isnan(val_meta_X)):
+                        val_meta_X = np.nan_to_num(val_meta_X, nan=0.0)
                     val_pred = temp_model.predict(val_meta_X)
                     score = np.sqrt(mean_squared_error(y_val, val_pred))
                     
@@ -100,7 +134,22 @@ class StackingEnsemble:
             }
             
             if val_predictions is not None and y_val is not None:
-                val_meta_X = np.column_stack([preds for preds in val_predictions.values()])
+                # Handle NaN in validation predictions
+                val_predictions_clean = {}
+                for model_name, preds in val_predictions.items():
+                    preds_clean = preds.copy()
+                    nan_mask = np.isnan(preds_clean)
+                    if np.any(nan_mask):
+                        nan_count = np.sum(nan_mask)
+                        print(f"Warning: {nan_count} NaN values found in {model_name} validation predictions, replacing with mean")
+                        mean_val = np.nanmean(preds_clean)
+                        preds_clean[nan_mask] = mean_val if not np.isnan(mean_val) else 0.0
+                    val_predictions_clean[model_name] = preds_clean
+                
+                val_meta_X = np.column_stack([preds for preds in val_predictions_clean.values()])
+                # Final check for NaN
+                if np.any(np.isnan(val_meta_X)):
+                    val_meta_X = np.nan_to_num(val_meta_X, nan=0.0)
                 val_data = lgb.Dataset(val_meta_X, label=y_val, reference=train_data)
                 
                 self.meta_model = lgb.train(
@@ -251,17 +300,53 @@ class EnsembleModel:
             from utils import time_series_cv_splits
             splits = time_series_cv_splits(X_train, n_splits=n_splits)
             
-            lgbm_oof = np.zeros(len(X_train))
-            tft_oof = np.zeros(len(X_train))
+            # Initialize OOF arrays with NaN to detect missing folds
+            n_train = len(X_train)
+            lgbm_oof = np.full(n_train, np.nan, dtype=float)
+            tft_oof = np.full(n_train, np.nan, dtype=float)
+            
+            # Defensive bounds check after splits
+            for fold_idx, (train_idx, val_idx) in enumerate(splits):
+                # Handle empty arrays (can happen for first fold with minimal training data)
+                max_train = np.max(train_idx) if len(train_idx) > 0 else -1
+                max_val = np.max(val_idx) if len(val_idx) > 0 else -1
+                
+                if max_val >= n_train or (max_train >= n_train and len(train_idx) > 0):
+                    raise IndexError(
+                        f"CV indices out-of-bounds for fold {fold_idx + 1}: "
+                        f"max(train_idx)={max_train}, max(val_idx)={max_val}, n_train={n_train}"
+                    )
             
             for fold, (train_idx, val_idx) in enumerate(splits):
                 print(f"\nFold {fold + 1}/{n_splits}")
+                
+                # Defensive sanity checks - fail early with clear message
+                # Handle empty train_idx (can happen for first fold with minimal training data)
+                if len(train_idx) > 0:
+                    assert max(train_idx) < len(X_train), f"train_idx out of range: max={max(train_idx)} >= len(X_train)={len(X_train)}"
+                assert max(val_idx) < len(X_train), f"val_idx out of range: max={max(val_idx)} >= len(X_train)={len(X_train)}"
+                if static_train is not None:
+                    assert len(static_train) == len(X_train), f"static_train length ({len(static_train)}) must equal X_train length ({len(X_train)}) for CV slicing"
+                if known_future_train is not None:
+                    assert len(known_future_train) == len(X_train), f"known_future_train length ({len(known_future_train)}) must equal X_train length ({len(X_train)}) for CV slicing"
+                if sample_weight_train is not None:
+                    assert len(sample_weight_train) == len(X_train), f"sample_weight_train length ({len(sample_weight_train)}) must equal X_train length ({len(X_train)}) for CV slicing"
+                
+                # Skip fold if training set is empty (can't train without data)
+                if len(train_idx) == 0:
+                    print(f"  Warning: Fold {fold + 1} has empty training set, skipping...")
+                    # Use mean of target as fallback prediction
+                    mean_pred = y_train.mean()
+                    lgbm_oof[val_idx] = mean_pred
+                    tft_oof[val_idx] = mean_pred
+                    continue
                 
                 X_train_fold = X_train.iloc[train_idx]
                 y_train_fold = y_train.iloc[train_idx]
                 X_val_fold = X_train.iloc[val_idx]
                 y_val_fold = y_train.iloc[val_idx]
                 
+                # Slice sample weights aligned to X_train if provided
                 sw_train_fold = sample_weight_train.iloc[train_idx] if sample_weight_train is not None else None
                 sw_val_fold = sample_weight_train.iloc[val_idx] if sample_weight_train is not None else None
                 
@@ -271,13 +356,14 @@ class EnsembleModel:
                                    sw_train_fold, sw_val_fold)
                 lgbm_oof[val_idx] = self.lgbm_model.predict(X_val_fold)
                 
-                # Train TFT (simplified - may need adjustment for sequence data)
+                # Train TFT
                 print("  Training TFT...")
-                # Use the *train* tables to slice both train/val folds. static_train/known_future_train
-                # are aligned with X_train (same index/length), so use those when forming folds.
+                # CRITICAL: For CV folds, ALWAYS slice from the *_train tables that align to X_train
+                # static_train and known_future_train are aligned with X_train (same index/length)
+                # val_idx refers to indices in X_train, so we must slice static_train/known_future_train
                 static_train_fold = static_train.iloc[train_idx] if static_train is not None else None
-                # IMPORTANT: val fold for TFT should come from the same "train" table (sliced by val_idx)
                 static_val_fold = static_train.iloc[val_idx] if static_train is not None else None
+                
                 known_train_fold = known_future_train.iloc[train_idx] if known_future_train is not None else None
                 known_val_fold = known_future_train.iloc[val_idx] if known_future_train is not None else None
                 
@@ -310,8 +396,31 @@ class EnsembleModel:
                     y_history_for_pred = y_train_fold.iloc[-input_window:]
                 else:
                     y_history_for_pred = y_train_fold
-                tft_oof[val_idx] = self.tft_model.predict(X_val_fold, y_history_for_pred if len(y_history_for_pred) > 0 else None,
-                                                          static_val_fold, known_val_fold)
+                
+                # Ensure shapes are consistent for prediction
+                assert len(X_val_fold) == len(static_val_fold) if static_val_fold is not None else True, \
+                    f"X_val_fold length ({len(X_val_fold)}) must match static_val_fold length ({len(static_val_fold)})"
+                assert len(X_val_fold) == len(known_val_fold) if known_val_fold is not None else True, \
+                    f"X_val_fold length ({len(X_val_fold)}) must match known_val_fold length ({len(known_val_fold)})"
+                
+                tft_pred = self.tft_model.predict(X_val_fold, y_history_for_pred if len(y_history_for_pred) > 0 else None,
+                                                  static_val_fold, known_val_fold)
+                # Handle NaN predictions from TFT (fallback to LightGBM)
+                nan_mask = np.isnan(tft_pred)
+                if np.any(nan_mask):
+                    nan_count = np.sum(nan_mask)
+                    print(f"  Warning: {nan_count} NaN values in TFT predictions for fold {fold + 1}, replacing with LightGBM predictions")
+                    tft_pred[nan_mask] = lgbm_oof[val_idx][nan_mask]
+                tft_oof[val_idx] = tft_pred
+            
+            # Assert that all OOF predictions are filled (no NaN unless intentionally skipped)
+            if np.any(np.isnan(lgbm_oof)):
+                raise ValueError(f"LightGBM OOF has {np.sum(np.isnan(lgbm_oof))} NaN values - some folds were not filled")
+            if np.any(np.isnan(tft_oof)):
+                # TFT OOF may have NaNs if folds were skipped - replace with LightGBM
+                nan_mask = np.isnan(tft_oof)
+                print(f"Warning: TFT OOF has {np.sum(nan_mask)} NaN values, replacing with LightGBM predictions")
+                tft_oof[nan_mask] = lgbm_oof[nan_mask]
             
             # Fit meta-learner on OOF predictions
             print("\n=== Training Meta-Learner ===")
@@ -334,6 +443,13 @@ class EnsembleModel:
             y_history_val = y_train.iloc[-self.tft_model.input_window:] if len(y_train) >= self.tft_model.input_window else y_train
             tft_val_pred = self.tft_model.predict(X_val, y_history_val, static_val, known_future_val)
             
+            # Handle NaN in TFT validation predictions (fallback to LightGBM)
+            nan_mask = np.isnan(tft_val_pred)
+            if np.any(nan_mask):
+                nan_count = np.sum(nan_mask)
+                print(f"Warning: {nan_count} NaN values in TFT validation predictions, replacing with LightGBM predictions")
+                tft_val_pred[nan_mask] = lgbm_val_pred[nan_mask]
+            
             val_predictions = {
                 'lightgbm': lgbm_val_pred,
                 'tft': tft_val_pred
@@ -343,7 +459,7 @@ class EnsembleModel:
                             val_predictions, y_val.values)
         
         else:
-            # Train on full training set
+            # Train on full training set (no CV)
             print("Training on full training set...")
             self.lgbm_model.fit(X_train, y_train, X_val, y_val,
                                sample_weight_train, sample_weight_val)
@@ -355,6 +471,13 @@ class EnsembleModel:
             # For stacking without CV, use validation predictions
             lgbm_val_pred = self.lgbm_model.predict(X_val)
             tft_val_pred = self.tft_model.predict(X_val, y_train, static_val, known_future_val)
+            
+            # Handle NaN in TFT validation predictions (fallback to LightGBM)
+            nan_mask = np.isnan(tft_val_pred)
+            if np.any(nan_mask):
+                nan_count = np.sum(nan_mask)
+                print(f"Warning: {nan_count} NaN values in TFT validation predictions, replacing with LightGBM predictions")
+                tft_val_pred[nan_mask] = lgbm_val_pred[nan_mask]
             
             val_predictions = {
                 'lightgbm': lgbm_val_pred,

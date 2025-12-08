@@ -1,0 +1,81 @@
+FEATURES DOCUMENTATION
+======================
+
+This document lists all features in the final dataset:
+  Data_SIH_2025_with_blh/Data_SIH_2025_with_blh/with_satellite/*.csv
+
+---
+
+GIVEN FEATURES (Original Input Columns)
+----------------------------------------
+
+Time/Date:
+  - year
+  - month
+  - day
+  - hour
+
+Forecast Variables:
+  - O3_forecast
+  - NO2_forecast
+  - T_forecast (temperature)
+  - q_forecast (specific humidity)
+  - u_forecast (zonal wind)
+  - v_forecast (meridional wind)
+  - w_forecast (vertical wind)
+  - blh_forecast (boundary layer height)
+
+Satellite Data:
+  - ratio_satellite (HCHO/NO2 ratio)
+
+Target Variables:
+  - O3_target
+  - NO2_target
+
+---
+
+CREATED FEATURES (Engineered/Computed)
+--------------------------------------
+
+Satellite Filled Features:
+  - NO2_satellite_filled (filled from NO2_forecast using daily normalization)
+  - HCHO_satellite_filled (filled from O3_forecast using daily normalization)
+
+BLH (Boundary Layer Height) Features:
+  - NO2_forecast_per_blh (NO2_forecast / (blh_forecast + eps))
+  - O3_forecast_per_blh (O3_forecast / (blh_forecast + eps))
+  - blh_delta_1h (hourly change: blh_forecast - blh_forecast.shift(1))
+  - blh_rel_change (relative hourly change: blh_forecast / (blh_forecast.shift(1) + eps))
+
+Time Features (Cyclic Encoding):
+  - sin_hour (sin(2π * hour / 24))
+  - cos_hour (cos(2π * hour / 24))
+
+Solar & Photochemical Features:
+  - SZA_deg (Solar Zenith Angle in degrees)
+  - cosSZA (cosine of SZA)
+  - solar_elevation (90 - SZA_deg)
+  - sunset_flag (1 if solar_elevation <= 0, else 0)
+  - solar_declination_deg (declination angle)
+  - hour_angle_deg (hour angle)
+  - solar_time_hr (solar time)
+  - EoT_min (Equation of Time in minutes)
+
+Wind & Transport Features:
+  - wind_speed (sqrt(u_forecast^2 + v_forecast^2))
+  - wind_dir_deg (wind direction in degrees, 0-360)
+  - wind_sector (categorical: 0-7 representing 8 compass directions)
+
+---
+
+TOTAL FEATURES: 34 columns
+
+Given: 15 columns
+Created: 19 columns
+
+---
+
+Feature Engineering Scripts:
+  1. fill_no2_satellite.py - Fills NO2_satellite_filled and HCHO_satellite_filled
+  2. add_blh_features.py - Adds BLH, time, solar, and wind features
+  3. merge_sza_columns.py - Merges solar columns from all_sites_sza_added
