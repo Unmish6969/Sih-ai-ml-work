@@ -1,16 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L, { LatLngBoundsExpression, LatLngTuple } from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet.heat';
+import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import { useTheme } from '@/contexts/ThemeContext';
-import { RefreshCw, MapPin, Flame, Droplets } from 'lucide-react';
+import { RefreshCw, Flame, Droplets } from 'lucide-react';
 
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+// Dynamically import the map content component to avoid SSR issues
+const DelhiAirMapContent = lazy(() => import('./DelhiAirMapContent').then(mod => ({ default: mod.default })));
 
 type Pollutant = 'O3' | 'NO2';
 type Dataset = 'actual' | 'predicted';
@@ -47,69 +43,15 @@ const pollutantRanges: Record<Pollutant, { min: number; max: number; color: stri
   NO2: { min: 0, max: 200, color: '#f97316', icon: <Flame className="w-4 h-4" /> },
 };
 
-// Fix marker icons for Vite builds
-const DefaultIcon = L.icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-L.Marker.prototype.options.icon = DefaultIcon;
-
-const HeatLayer: React.FC<{
-  points: Array<[number, number, number]>;
-  radius?: number;
-  blur?: number;
-  gradient?: Record<string, string>;
-}> = ({ points, radius = 28, blur = 18, gradient }) => {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map) return;
-    const layer = (L as any).heatLayer(points, {
-      radius,
-      blur,
-      maxZoom: 17,
-      minOpacity: 0.15,
-      gradient,
-    });
-    layer.addTo(map);
-    return () => {
-      map.removeLayer(layer);
-    };
-  }, [map, points, radius, blur, gradient]);
-
-  return null;
-};
-
-// Component to fit map bounds to show all markers
-const FitBounds: React.FC<{ sites: SiteReading[] }> = ({ sites }) => {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map || sites.length === 0) return;
-    
-    // Calculate bounds from all site locations
-    const bounds = L.latLngBounds(
-      sites.map(site => [site.lat, site.lon] as LatLngTuple)
-    );
-    
-    // Fit bounds with padding to ensure all markers are visible
-    map.fitBounds(bounds, {
-      padding: [50, 50], // Add padding so markers aren't at the edge
-      maxZoom: 12, // Limit max zoom to keep overview
-    });
-  }, [map, sites]);
-
-  return null;
-};
-
 export default function DelhiAirMap({ sites, onRefresh }: DelhiAirMapProps) {
   const { theme } = useTheme();
   const [dataset, setDataset] = useState<Dataset>('actual');
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Ensure component only renders on client side
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const data = sites ?? defaultSites;
   
@@ -202,13 +144,6 @@ export default function DelhiAirMap({ sites, onRefresh }: DelhiAirMapProps) {
       <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
         {(['NO2', 'O3'] as Pollutant[]).map((pollutant) => {
           const range = pollutantRanges[pollutant];
-          const heatPoints = data.map((site) => {
-            const key = `${pollutant}_${dataset}` as keyof SiteReading;
-            const raw = site[key] as number;
-            const clamp = (v: number) => Math.max(range.min, Math.min(range.max, v));
-            const normalized = (clamp(raw) - range.min) / (range.max - range.min || 1);
-            return [site.lat, site.lon, normalized] as [number, number, number];
-          });
 
           return (
             <div key={pollutant} className="flex flex-col gap-3">
@@ -222,66 +157,29 @@ export default function DelhiAirMap({ sites, onRefresh }: DelhiAirMapProps) {
                 </div>
               </div>
 
-              <div className="relative h-[420px] w-full">
-                <MapContainer
-                  {...({
-                    center: center as [number, number],
-                    zoom: 11,
-                    minZoom: 9,
-                    maxZoom: 16,
-                    maxBounds: bounds,
-                    maxBoundsViscosity: 1.0,
-                    scrollWheelZoom: true,
-                    className: 'h-full w-full',
-                  } as any)}
-                >
-                  <TileLayer {...({ attribution: '&copy; OpenStreetMap', url: tileUrl } as any)} />
-                  <FitBounds sites={data} />
-                  <HeatLayer points={heatPoints} gradient={gradient} />
-
-                  {data.map((site) => {
-                    const key = `${pollutant}_${dataset}` as keyof SiteReading;
-                    const value = site[key] as number;
-                    return (
-                      <Marker key={`${pollutant}-${site.id}`} position={[site.lat, site.lon]}>
-                        <Popup>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2 font-semibold text-slate-800">
-                              <MapPin className="w-4 h-4 text-cyan-600" />
-                              <span>{site.name}</span>
-                            </div>
-                            <div className="text-sm text-slate-600">
-                              <div className="flex items-center gap-2">
-                                {range.icon}
-                                <span>
-                                  {pollutant === 'O3' ? 'O₃' : 'NO₂'} ({dataset}):{' '}
-                                  <span className="font-semibold text-slate-900">{value.toFixed(1)} ppb</span>
-                                </span>
-                              </div>
-                              <div className="text-xs text-slate-500 mt-1">Updated: {new Date(site.updatedAt).toLocaleString()}</div>
-                            </div>
-                          </div>
-                        </Popup>
-                      </Marker>
-                    );
-                  })}
-                </MapContainer>
-
-                <div
-                  className={`absolute right-3 bottom-3 rounded-lg border px-3 py-2 shadow-md ${
-                    theme === 'dark' ? 'bg-slate-900/80 border-slate-700 text-slate-100' : 'bg-white/90 border-slate-200 text-slate-700'
-                  }`}
-                >
-                  <div className="text-xs font-semibold mb-1 flex items-center gap-1" style={{ color: range.color }}>
-                    {range.icon}
-                    <span>{pollutant === 'O3' ? 'O₃' : 'NO₂'} ({dataset})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-32 rounded-full" style={{ background: 'linear-gradient(90deg, #0ea5e9, #22d3ee, #a3e635, #f59e0b, #ef4444)' }} />
-                    <div className="text-[10px] text-slate-500">{range.min}–{range.max} ppb</div>
-                  </div>
+              <Suspense fallback={
+                <div className="relative h-[420px] w-full flex items-center justify-center">
+                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Loading map...</p>
                 </div>
-              </div>
+              }>
+                {isMounted && (
+                  <DelhiAirMapContent
+                    data={data}
+                    pollutant={pollutant}
+                    dataset={dataset}
+                    center={center}
+                    bounds={bounds}
+                    tileUrl={tileUrl}
+                    gradient={gradient}
+                    range={range}
+                  />
+                )}
+                {!isMounted && (
+                  <div className="relative h-[420px] w-full flex items-center justify-center">
+                    <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Loading map...</p>
+                  </div>
+                )}
+              </Suspense>
             </div>
           );
         })}
