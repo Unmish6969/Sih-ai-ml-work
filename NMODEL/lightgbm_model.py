@@ -7,7 +7,11 @@ import pandas as pd
 import lightgbm as lgb
 from typing import Tuple, Optional, List, Dict
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-import optuna
+try:
+    import optuna
+    OPTUNA_AVAILABLE = True
+except ImportError:
+    OPTUNA_AVAILABLE = False
 from utils import time_series_cv_splits, prepare_features
 
 
@@ -127,6 +131,11 @@ class LightGBMModel:
         
         # Hyperparameter tuning with Optuna
         if self.use_optuna:
+            if not OPTUNA_AVAILABLE:
+                raise ImportError(
+                    "Optuna is required for hyperparameter tuning. "
+                    "Install it with: pip install optuna>=3.0.0"
+                )
             study = optuna.create_study(direction='minimize')
             study.optimize(
                 lambda trial: self._objective(

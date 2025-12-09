@@ -103,11 +103,11 @@ export default function Sidebar({ activeNav = 'dashboard', onNavChange }: Sideba
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const navItems: NavItem[] = [
-    { id: 'about', label: 'About', icon: <Info className="w-5 h-5" />, path: '/' },
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" />, path: '/dashboard' },
+    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" />, path: '/' },
     { id: 'forecast', label: 'Forecast', icon: <TrendingUp className="w-5 h-5" />, path: '/forecast' },
     { id: 'evaluation', label: 'Model Evaluation', icon: <BarChart3 className="w-5 h-5" />, path: '/model_evaluation' },
     { id: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" />, path: '/reports' },
+    { id: 'about', label: 'About', icon: <Info className="w-5 h-5" />, path: '/about' },
     
   ];
 

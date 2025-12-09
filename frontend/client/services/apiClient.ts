@@ -153,6 +153,58 @@ class ApiClient {
     }
     return this.request(`/api/v1/predict/site/${siteId}/historical?days=${days || 30}`);
   }
+
+  /**
+   * Predict from CSV file upload
+   */
+  async predictFromCSV(siteId: number, file: File, forecastHours?: number): Promise<PredictResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Only include forecast_hours if it's <= 48 (API limit)
+    // If CSV has more rows, let backend process all rows
+    const url = forecastHours && forecastHours <= 48 
+      ? `/api/v1/predict/site/${siteId}/csv?forecast_hours=${forecastHours}`
+      : `/api/v1/predict/site/${siteId}/csv`;
+    
+    try {
+      const response = await fetch(`${this.baseUrl}${url}`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        let errorMessage = `API Error: ${response.statusText} (${response.status})`;
+        try {
+          const errorData = await response.json();
+          if (errorData.detail || errorData.message) {
+            errorMessage = errorData.detail || errorData.message;
+          }
+        } catch {
+          // If response is not JSON, use the status text
+        }
+        throw {
+          message: errorMessage,
+          status: response.status,
+        } as ApiError;
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error && typeof error === 'object' && 'message' in error) {
+        throw error;
+      }
+      if (error instanceof Error) {
+        throw {
+          message: `Network error: ${error.message}. Make sure the backend server is running on ${this.baseUrl}`
+        } as ApiError;
+      }
+      throw { message: 'Unknown error occurred' } as ApiError;
+    }
+  }
 }
 
 const apiClient = new ApiClient();

@@ -1,10 +1,13 @@
 """
 Model loader utility for loading trained ML models
 Supports loading models for 7 individual sites and 1 unified model
+Now uses the new xgboost_per_site structure with separate .pkl files and metadata.json
 """
 
 import os
 import joblib
+import json
+import glob
 from typing import Dict, Optional, Tuple
 from pathlib import Path
 
@@ -29,9 +32,41 @@ class ModelLoader:
         self._models_cache: Dict[str, Dict] = {}
         self._feature_cols_cache: Dict[str, list] = {}
     
+    def _find_latest_models(self, site_id: int) -> Tuple[Path, Path, Optional[Path]]:
+        """
+        Find the latest trained models for a site in xgboost_per_site structure
+        
+        Args:
+            site_id: Site number (1-7)
+            
+        Returns:
+            Tuple of (o3_model_path, no2_model_path, metadata_path)
+        """
+        site_dir = self.models_dir / "xgboost_per_site" / f"site_{site_id}"
+        
+        if not site_dir.exists():
+            # Fallback to old structure
+            old_model_file = self.models_dir / f"site_{site_id}_models.joblib"
+            if old_model_file.exists():
+                return old_model_file, old_model_file, None
+            raise FileNotFoundError(f"Model directory not found: {site_dir}")
+        
+        o3_models = list(site_dir.glob("O3_model_*.pkl"))
+        no2_models = list(site_dir.glob("NO2_model_*.pkl"))
+        metadata_files = list(site_dir.glob("metadata_*.json"))
+        
+        if not o3_models or not no2_models:
+            raise FileNotFoundError(f"No models found for site {site_id} in {site_dir}")
+        
+        o3_model_path = max(o3_models, key=lambda p: p.stat().st_mtime)
+        no2_model_path = max(no2_models, key=lambda p: p.stat().st_mtime)
+        metadata_path = max(metadata_files, key=lambda p: p.stat().st_mtime) if metadata_files else None
+        
+        return o3_model_path, no2_model_path, metadata_path
+    
     def _get_model_path(self, site_id: Optional[int] = None) -> Path:
         """
-        Get model file path for a site or unified model
+        Get model file path for a site or unified model (legacy support)
         
         Args:
             site_id: Site number (1-7) or None for unified model
@@ -53,7 +88,7 @@ class ModelLoader:
     
     def _get_features_path(self, site_id: Optional[int] = None) -> Path:
         """
-        Get features file path for a site or unified model
+        Get features file path for a site or unified model (legacy support)
         
         Args:
             site_id: Site number (1-7) or None for unified model
@@ -94,7 +129,50 @@ class ModelLoader:
         if use_cache and cache_key in self._models_cache:
             return self._models_cache[cache_key]
         
-        # Load model file
+        # Try new structure first (xgboost_per_site)
+        if site_id is not None and 1 <= site_id <= 7:
+            try:
+                o3_model_path, no2_model_path, metadata_path = self._find_latest_models(site_id)
+                
+                # Load models
+                model_o3 = joblib.load(o3_model_path)
+                model_no2 = joblib.load(no2_model_path)
+                
+                # Load feature columns from metadata
+                if metadata_path:
+                    with open(metadata_path, 'r') as f:
+                        metadata = json.load(f)
+                    feature_cols = metadata.get('features', [])
+                    saved_at = metadata.get('timestamp', 'Unknown')
+                else:
+                    # Fallback: try to infer from old structure
+                    features_path = self._get_features_path(site_id)
+                    if features_path.exists():
+                        with open(features_path, 'r') as f:
+                            feature_cols = [line.strip() for line in f.readlines() if line.strip()]
+                    else:
+                        raise ValueError(f"Could not find feature list for site {site_id}")
+                    saved_at = 'Unknown'
+                
+                result = {
+                    'model_o3': model_o3,
+                    'model_no2': model_no2,
+                    'feature_cols': feature_cols,
+                    'site_id': site_id,
+                    'saved_at': saved_at
+                }
+                
+                # Cache the result
+                if use_cache:
+                    self._models_cache[cache_key] = result
+                    self._feature_cols_cache[cache_key] = feature_cols
+                
+                return result
+            except (FileNotFoundError, ValueError) as e:
+                # Fall back to old structure if new structure not found
+                pass
+        
+        # Fallback to old structure (for unified model or if new structure not available)
         model_path = self._get_model_path(site_id)
         model_data = joblib.load(model_path)
         
@@ -134,7 +212,20 @@ class ModelLoader:
         if cache_key in self._feature_cols_cache:
             return self._feature_cols_cache[cache_key]
         
-        # Load features file
+        # Try new structure first
+        if site_id is not None and 1 <= site_id <= 7:
+            try:
+                _, _, metadata_path = self._find_latest_models(site_id)
+                if metadata_path:
+                    with open(metadata_path, 'r') as f:
+                        metadata = json.load(f)
+                    feature_cols = metadata.get('features', [])
+                    self._feature_cols_cache[cache_key] = feature_cols
+                    return feature_cols
+            except (FileNotFoundError, ValueError):
+                pass
+        
+        # Fallback to old structure
         features_path = self._get_features_path(site_id)
         with open(features_path, 'r') as f:
             feature_cols = [line.strip() for line in f.readlines() if line.strip()]

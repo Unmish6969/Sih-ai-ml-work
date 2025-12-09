@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ModelHealthResponse, PredictResponse, ModelDetailResponse } from '@shared/api';
-import { generateDummy24HourForecast, generateDummyHealthStatus, generateDummyModelDetail } from '@/services/dummyData';
+import apiClient from '@/services/apiClient';
 import SiteSelector from '@/components/SiteSelector';
 import HealthStatus from '@/components/HealthStatus';
 import ForecastChart from './ForecastChart';
@@ -30,19 +30,18 @@ export default function Forecast() {
       setLoading(true);
       setError(null);
 
-      const [forecast, health, detail] = await Promise.all([
-        Promise.resolve(generateDummy24HourForecast(siteId, hours)),
-        Promise.resolve(generateDummyHealthStatus()),
-        Promise.resolve(generateDummyModelDetail(siteId)),
-      ]);
+      // Fetch from backend API
+      const forecast = await apiClient.livePrediction24hSite(siteId);
+      const health = await apiClient.healthCheckModels();
+      const detail = await apiClient.healthCheckModelDetail(siteId);
 
-      setForecastData(forecast);
+      setForecastData(forecast as unknown as PredictResponse);
       setHealthStatus(health);
       setModelDetail(detail);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data from backend';
       setError(errorMessage);
-      console.error('Error:', err);
+      console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
     }
@@ -152,6 +151,7 @@ export default function Forecast() {
                 </div>
 
                 <ForecastChart data={forecastData} siteId={selectedSite} timeRange={timeRange} />
+
               </div>
             )}
 

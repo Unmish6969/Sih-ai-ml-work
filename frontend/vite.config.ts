@@ -7,7 +7,8 @@ import { createServer } from "./server";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 8081,
+    strictPort: true,
     fs: {
       // Allow Vite to serve the client, shared and repository root files
       // (index.html sits in the repo root). See:
@@ -36,7 +37,6 @@ function expressPlugin(): Plugin {
     apply: "serve", // Only apply during development (serve mode)
     configureServer(server) {
       const app = createServer();
-
       // Add Express app as middleware to Vite dev server
       server.middlewares.use(app);
     },

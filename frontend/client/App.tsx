@@ -37,7 +37,8 @@ export default function App() {
                 { <Route path="/forecast" element={<Forecast />} /> }
                 <Route path="/model_evaluation" element={<ModelEvaluation />} />
                 <Route path="/reports" element={<Reports />} />
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/about" element={<About />} />
 
               </Route>
               

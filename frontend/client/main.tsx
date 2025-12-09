@@ -1,4 +1,5 @@
 import "./global.css";
+// Leaflet CSS will be dynamically imported in DelhiAirMapContent to avoid SSR issues
 
 import { createRoot } from "react-dom/client";
 import App from "./App";

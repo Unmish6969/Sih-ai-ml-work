@@ -2,13 +2,14 @@
 Prediction API routes for air pollution forecasting
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, UploadFile, File
 from typing import Optional, List, Dict, Any
 import pandas as pd
 import logging
 import json
 from pathlib import Path
 from datetime import datetime, timedelta
+import io
 
 from app.schemas.predict_request import PredictRequest
 from app.schemas.predict_response import PredictResponse, ErrorResponse, LiveSourceMetadata
@@ -20,7 +21,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/predict", tags=["predictions"])
 
 # Initialize services (paths resolved relative to backend root)
-prediction_service = PredictionService(models_dir="Data_SIH_2025/models")
+prediction_service = PredictionService(
+    models_dir="Data_SIH_2025/models",
+    lat_lon_path="Data_SIH_2025/lat_lon_sites.txt"
+)
 live_data_service = LiveDataService(lat_lon_path="Data_SIH_2025/lat_lon_sites.txt")
 METRICS_FILE = Path(__file__).resolve().parent.parent / "data" / "model_metrics.json"
 _cached_metrics: Optional[dict] = None
@@ -88,6 +92,12 @@ async def get_historical_data(site_id: int, days: int = 30, hours: int = None):
             hours_to_fetch = min(hours, 24)  # Max 24 hours
             time_period = f"{hours_to_fetch} hours"
         else:
+            # Validate days parameter: must be positive and within valid range
+            if days <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"days parameter must be positive (1-30), got {days}"
+                )
             if days > 30:
                 days = 30
             hours_to_fetch = days * 24
@@ -122,35 +132,44 @@ async def get_historical_data(site_id: int, days: int = 30, hours: int = None):
             # For hours, get last N hours of data points
             df_recent = df.head(hours_to_fetch).sort_values('datetime', ascending=True)
         else:
-            # For days, get all data from the last N calendar days from TODAY ONLY
-            # Use today's date as the reference point (no fallback to CSV dates)
+            # For days, get all data from the last N calendar days from the most recent date in CSV
+            # Use the most recent date in the CSV as the reference point (handles legacy data)
             from datetime import datetime
-            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
             
-            # Calculate cutoff: N days before today (at start of day)
-            # For 7 days: if today is Dec 8, cutoff is Dec 1 (includes Dec 1-8, 7 days)
-            # For 30 days: if today is Dec 8, cutoff is Nov 8 (includes Nov 8 - Dec 8, 30 days)
-            cutoff_date = today - pd.Timedelta(days=days - 1)  # days-1 because we want inclusive
+            # Find the most recent date in the CSV data
+            if len(df) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"No data found in CSV file for site {site_id}"
+                )
             
-            # Filter to only include data from the last N calendar days from TODAY (inclusive)
-            df_recent = df[(df['datetime'] >= cutoff_date) & (df['datetime'] <= today)].sort_values('datetime', ascending=True)
+            most_recent_date = df['datetime'].max()
+            reference_date = most_recent_date.replace(hour=0, minute=0, second=0, microsecond=0)
             
-            # Additional validation: ensure we only have the last N unique calendar days from today
+            # Calculate cutoff: N days before the most recent date (at start of day)
+            # For 7 days: if most recent is Dec 8, cutoff is Dec 1 (includes Dec 1-8, 7 days)
+            # For 30 days: if most recent is Dec 8, cutoff is Nov 8 (includes Nov 8 - Dec 8, 30 days)
+            cutoff_date = reference_date - pd.Timedelta(days=days - 1)  # days-1 because we want inclusive
+            
+            # Filter to only include data from the last N calendar days from the most recent date (inclusive)
+            df_recent = df[(df['datetime'] >= cutoff_date) & (df['datetime'] <= most_recent_date)].sort_values('datetime', ascending=True)
+            
+            # Additional validation: ensure we only have the last N unique calendar days from the reference date
             if len(df_recent) > 0:
                 # Get unique dates and sort
                 unique_dates = sorted(df_recent['datetime'].dt.date.unique(), reverse=True)
                 
-                # Take only the last N calendar days from today
+                # Take only the last N calendar days from the reference date
                 if len(unique_dates) > days:
-                    # Get the N most recent dates (closest to today)
+                    # Get the N most recent dates (closest to reference date)
                     unique_dates_to_keep = unique_dates[:days]
                     # Filter to only those dates
                     df_recent = df_recent[df_recent['datetime'].dt.date.isin(unique_dates_to_keep)]
                 
                 unique_dates_final = sorted(df_recent['datetime'].dt.date.unique())
-                logger.info(f"Historical data: {len(df_recent)} points, {len(unique_dates_final)} unique days from {unique_dates_final[0] if unique_dates_final else 'N/A'} to {unique_dates_final[-1] if unique_dates_final else 'N/A'} (requested: last {days} days from TODAY {today.date()})")
+                logger.info(f"Historical data: {len(df_recent)} points, {len(unique_dates_final)} unique days from {unique_dates_final[0] if unique_dates_final else 'N/A'} to {unique_dates_final[-1] if unique_dates_final else 'N/A'} (requested: last {days} days from most recent date {reference_date.date()})")
             else:
-                logger.warning(f"No data found for the last {days} days from TODAY {today.date()}. CSV data may be older than the requested date range.")
+                logger.warning(f"No data found for the last {days} days from the most recent date {reference_date.date()} in CSV. This may indicate insufficient data in the requested range.")
         
         # Convert to list of dictionaries
         historical_data = []
@@ -412,6 +431,187 @@ async def predict_site(
 
 
 @router.post(
+    "/site/{site_id}/csv",
+    response_model=PredictResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Predict air pollution from CSV file",
+    description="Upload a CSV file with input data and get predictions for O3 and NO2"
+)
+async def predict_site_from_csv(
+    site_id: int,
+    file: UploadFile = File(..., description="CSV file with input data"),
+    forecast_hours: Optional[int] = 24
+):
+    """
+    Predict air pollution from CSV file upload
+    
+    Args:
+        site_id: Site number (1-7)
+        file: CSV file with input data (must contain: year, month, day, hour, and forecast fields)
+        forecast_hours: Number of hours to forecast (default: 24, max: 48)
+        
+    Returns:
+        PredictResponse with predictions
+    """
+    logger.info(f"Received CSV upload request for site {site_id}, file: {file.filename}, size: {file.size if hasattr(file, 'size') else 'unknown'}")
+    try:
+        # Validate site_id
+        if not 1 <= site_id <= 7:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Site ID must be between 1 and 7, got {site_id}"
+            )
+        
+        # Validate forecast_hours (if provided)
+        if forecast_hours is not None and (forecast_hours < 1 or forecast_hours > 48):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="forecast_hours must be between 1 and 48"
+            )
+        
+        # Validate file type
+        if not file.filename.endswith('.csv'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File must be a CSV file"
+            )
+        
+        # Read CSV file
+        logger.info(f"Reading CSV file content...")
+        contents = await file.read()
+        logger.info(f"Read {len(contents)} bytes from CSV file")
+        
+        try:
+            # Try to decode as UTF-8
+            csv_content = contents.decode('utf-8')
+        except UnicodeDecodeError:
+            # Try other encodings
+            try:
+                csv_content = contents.decode('latin-1')
+            except UnicodeDecodeError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="CSV file encoding not supported. Please use UTF-8 or Latin-1 encoding."
+                )
+        
+        # Parse CSV
+        logger.info(f"Parsing CSV content ({len(csv_content)} characters)...")
+        try:
+            df = pd.read_csv(io.StringIO(csv_content))
+            logger.info(f"CSV parsed successfully: {len(df)} rows, {len(df.columns)} columns")
+        except Exception as e:
+            logger.error(f"Failed to parse CSV: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to parse CSV file: {str(e)}"
+            )
+        
+        # Validate required columns
+        required_cols = ['year', 'month', 'day', 'hour']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"CSV file missing required columns: {', '.join(missing_cols)}"
+            )
+        
+        # Convert DataFrame to list of dictionaries
+        # Handle case-insensitive column names
+        df.columns = df.columns.str.strip()
+        input_data = []
+        
+        for _, row in df.iterrows():
+            data_point = {
+                'year': int(row['year']),
+                'month': int(row['month']),
+                'day': int(row['day']),
+                'hour': int(row['hour']),
+            }
+            
+            # Add optional forecast fields (case-insensitive)
+            optional_fields = {
+                'O3_forecast': ['O3_forecast', 'o3_forecast', 'O3', 'o3'],
+                'NO2_forecast': ['NO2_forecast', 'no2_forecast', 'NO2', 'no2'],
+                'T_forecast': ['T_forecast', 't_forecast', 'temperature', 'Temperature'],
+                'q_forecast': ['q_forecast', 'Q_forecast', 'humidity', 'Humidity'],
+                'u_forecast': ['u_forecast', 'U_forecast', 'u_wind', 'U_wind'],
+                'v_forecast': ['v_forecast', 'V_forecast', 'v_wind', 'V_wind'],
+                'w_forecast': ['w_forecast', 'W_forecast', 'w_wind', 'W_wind'],
+                'blh_forecast': ['blh_forecast', 'BLH_forecast', 'blh', 'BLH'],
+                'NO2_satellite': ['NO2_satellite', 'no2_satellite'],
+                'HCHO_satellite': ['HCHO_satellite', 'hcho_satellite'],
+                'ratio_satellite': ['ratio_satellite', 'Ratio_satellite'],
+                'SZA_deg': ['SZA_deg', 'sza_deg', 'SZA', 'sza'],
+            }
+            
+            for field_name, possible_names in optional_fields.items():
+                for name in possible_names:
+                    if name in df.columns:
+                        value = row[name]
+                        if pd.notna(value):
+                            data_point[field_name] = float(value)
+                        break
+            
+            input_data.append(data_point)
+        
+        if len(input_data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CSV file contains no valid data rows"
+            )
+        
+        # Validate input data
+        is_valid, error_msg = prediction_service.validate_input_data(input_data, site_id=site_id)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg
+            )
+        
+        # Limit forecast hours if needed
+        # If forecast_hours is provided, limit to that; otherwise use all rows (but cap at 48 for safety)
+        if forecast_hours is not None:
+            actual_forecast_hours = forecast_hours
+            if len(input_data) > actual_forecast_hours:
+                input_data = input_data[:actual_forecast_hours]
+        else:
+            # If no forecast_hours specified, use all rows but warn if > 48
+            actual_forecast_hours = len(input_data)
+            if actual_forecast_hours > 48:
+                logger.warning(f"CSV contains {actual_forecast_hours} rows, which exceeds recommended 48 hours. Processing all rows.")
+        
+        # Make predictions
+        predictions = prediction_service.predict_from_dict(
+            input_data=input_data,
+            site_id=site_id,
+            forecast_hours=actual_forecast_hours
+        )
+        
+        return PredictResponse(
+            success=True,
+            site_id=site_id,
+            forecast_hours=len(predictions),
+            predictions=predictions,
+            message=f"Successfully generated {len(predictions)} predictions from CSV file for site {site_id}"
+        )
+        
+    except HTTPException:
+        raise
+    except FileNotFoundError as e:
+        logger.error(f"Model file not found: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model for site {site_id} not found. Please ensure models are trained and available."
+        )
+    except Exception as e:
+        logger.error(f"Error processing CSV file: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing CSV file: {str(e)}"
+        )
+
+
+@router.post(
     "/unified",
     response_model=PredictResponse,
     status_code=status.HTTP_200_OK,
@@ -548,4 +748,3 @@ async def predict(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error making predictions: {str(e)}"
         )
-
