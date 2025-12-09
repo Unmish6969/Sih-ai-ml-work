@@ -1081,3 +1081,357 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.waqi.info', p
 2025-12-08 17:40:47 - app.main - INFO - Loaded model for site 7
 2025-12-08 17:40:47 - app.main - INFO - Loaded unified model
 2025-12-08 17:40:47 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 03:37:46 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 03:37:46 - app.main - INFO - Loading models...
+2025-12-09 03:37:46 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 03:37:53 - app.main - INFO - Loaded model for site 1
+2025-12-09 03:37:53 - app.main - INFO - Loaded model for site 2
+2025-12-09 03:37:53 - app.main - INFO - Loaded model for site 3
+2025-12-09 03:37:53 - app.main - INFO - Loaded model for site 4
+2025-12-09 03:37:53 - app.main - INFO - Loaded model for site 5
+2025-12-09 03:37:53 - app.main - INFO - Loaded model for site 6
+2025-12-09 03:37:53 - app.main - INFO - Loaded model for site 7
+2025-12-09 03:37:53 - app.main - INFO - Loaded unified model
+2025-12-09 03:37:53 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 03:47:45 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 03:47:47 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 03:47:47 - app.main - INFO - Loading models...
+2025-12-09 03:47:47 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 03:47:48 - app.main - INFO - Loaded model for site 1
+2025-12-09 03:47:48 - app.main - INFO - Loaded model for site 2
+2025-12-09 03:47:48 - app.main - INFO - Loaded model for site 3
+2025-12-09 03:47:48 - app.main - INFO - Loaded model for site 4
+2025-12-09 03:47:48 - app.main - INFO - Loaded model for site 5
+2025-12-09 03:47:48 - app.main - INFO - Loaded model for site 6
+2025-12-09 03:47:48 - app.main - INFO - Loaded model for site 7
+2025-12-09 03:47:48 - app.main - INFO - Loaded unified model
+2025-12-09 03:47:48 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 03:47:50 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 03:47:50 - app.main - INFO - Loading models...
+2025-12-09 03:47:50 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 03:47:51 - app.main - INFO - Loaded model for site 1
+2025-12-09 03:47:51 - app.main - INFO - Loaded model for site 2
+2025-12-09 03:47:51 - app.main - INFO - Loaded model for site 3
+2025-12-09 03:47:51 - app.main - INFO - Loaded model for site 4
+2025-12-09 03:47:51 - app.main - INFO - Loaded model for site 5
+2025-12-09 03:47:51 - app.main - INFO - Loaded model for site 6
+2025-12-09 03:47:51 - app.main - INFO - Loaded model for site 7
+2025-12-09 03:47:51 - app.main - INFO - Loaded unified model
+2025-12-09 03:47:51 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 03:51:11 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 03:51:13 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 03:51:13 - app.main - INFO - Loading models...
+2025-12-09 03:51:13 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 03:51:13 - app.main - INFO - Loaded model for site 1
+2025-12-09 03:51:13 - app.main - INFO - Loaded model for site 2
+2025-12-09 03:51:13 - app.main - INFO - Loaded model for site 3
+2025-12-09 03:51:13 - app.main - INFO - Loaded model for site 4
+2025-12-09 03:51:13 - app.main - INFO - Loaded model for site 5
+2025-12-09 03:51:13 - app.main - INFO - Loaded model for site 6
+2025-12-09 03:51:13 - app.main - INFO - Loaded model for site 7
+2025-12-09 03:51:14 - app.main - INFO - Loaded unified model
+2025-12-09 03:51:14 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 03:51:15 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 03:51:15 - app.main - INFO - Loading models...
+2025-12-09 03:51:15 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 03:51:16 - app.main - INFO - Loaded model for site 1
+2025-12-09 03:51:16 - app.main - INFO - Loaded model for site 2
+2025-12-09 03:51:16 - app.main - INFO - Loaded model for site 3
+2025-12-09 03:51:16 - app.main - INFO - Loaded model for site 4
+2025-12-09 03:51:16 - app.main - INFO - Loaded model for site 5
+2025-12-09 03:51:16 - app.main - INFO - Loaded model for site 6
+2025-12-09 03:51:16 - app.main - INFO - Loaded model for site 7
+2025-12-09 03:51:16 - app.main - INFO - Loaded unified model
+2025-12-09 03:51:16 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 04:00:11 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 04:00:12 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 04:00:12 - app.main - INFO - Loading models...
+2025-12-09 04:00:12 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 04:00:13 - app.main - INFO - Loaded model for site 1
+2025-12-09 04:00:13 - app.main - INFO - Loaded model for site 2
+2025-12-09 04:00:13 - app.main - INFO - Loaded model for site 3
+2025-12-09 04:00:13 - app.main - INFO - Loaded model for site 4
+2025-12-09 04:00:13 - app.main - INFO - Loaded model for site 5
+2025-12-09 04:00:13 - app.main - INFO - Loaded model for site 6
+2025-12-09 04:00:14 - app.main - INFO - Loaded model for site 7
+2025-12-09 04:00:14 - app.main - INFO - Loaded unified model
+2025-12-09 04:00:14 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 04:00:15 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 04:00:15 - app.main - INFO - Loading models...
+2025-12-09 04:00:15 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 04:00:15 - app.main - INFO - Loaded model for site 1
+2025-12-09 04:00:15 - app.main - INFO - Loaded model for site 2
+2025-12-09 04:00:15 - app.main - INFO - Loaded model for site 3
+2025-12-09 04:00:15 - app.main - INFO - Loaded model for site 4
+2025-12-09 04:00:15 - app.main - INFO - Loaded model for site 5
+2025-12-09 04:00:15 - app.main - INFO - Loaded model for site 6
+2025-12-09 04:00:15 - app.main - INFO - Loaded model for site 7
+2025-12-09 04:00:15 - app.main - INFO - Loaded unified model
+2025-12-09 04:00:15 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 04:04:05 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 04:04:07 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 04:04:07 - app.main - INFO - Loading models...
+2025-12-09 04:04:07 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 04:04:07 - app.main - INFO - Loaded model for site 1
+2025-12-09 04:04:07 - app.main - INFO - Loaded model for site 2
+2025-12-09 04:04:07 - app.main - INFO - Loaded model for site 3
+2025-12-09 04:04:07 - app.main - INFO - Loaded model for site 4
+2025-12-09 04:04:07 - app.main - INFO - Loaded model for site 5
+2025-12-09 04:04:07 - app.main - INFO - Loaded model for site 6
+2025-12-09 04:04:07 - app.main - INFO - Loaded model for site 7
+2025-12-09 04:04:07 - app.main - INFO - Loaded unified model
+2025-12-09 04:04:07 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 04:07:41 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 04:07:42 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 04:07:42 - app.main - INFO - Loading models...
+2025-12-09 04:07:42 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 04:07:43 - app.main - INFO - Loaded model for site 1
+2025-12-09 04:07:43 - app.main - INFO - Loaded model for site 2
+2025-12-09 04:07:43 - app.main - INFO - Loaded model for site 3
+2025-12-09 04:07:43 - app.main - INFO - Loaded model for site 4
+2025-12-09 04:07:43 - app.main - INFO - Loaded model for site 5
+2025-12-09 04:07:43 - app.main - INFO - Loaded model for site 6
+2025-12-09 04:07:43 - app.main - INFO - Loaded model for site 7
+2025-12-09 04:07:43 - app.main - INFO - Loaded unified model
+2025-12-09 04:07:43 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 04:07:45 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 04:07:45 - app.main - INFO - Loading models...
+2025-12-09 04:07:45 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 04:07:46 - app.main - INFO - Loaded model for site 1
+2025-12-09 04:07:46 - app.main - INFO - Loaded model for site 2
+2025-12-09 04:07:46 - app.main - INFO - Loaded model for site 3
+2025-12-09 04:07:46 - app.main - INFO - Loaded model for site 4
+2025-12-09 04:07:46 - app.main - INFO - Loaded model for site 5
+2025-12-09 04:07:46 - app.main - INFO - Loaded model for site 6
+2025-12-09 04:07:46 - app.main - INFO - Loaded model for site 7
+2025-12-09 04:07:46 - app.main - INFO - Loaded unified model
+2025-12-09 04:07:46 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 04:08:04 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 04:08:11 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 04:08:11 - app.main - INFO - Loading models...
+2025-12-09 04:08:11 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 04:08:11 - app.main - INFO - Loaded model for site 1
+2025-12-09 04:08:11 - app.main - INFO - Loaded model for site 2
+2025-12-09 04:08:11 - app.main - INFO - Loaded model for site 3
+2025-12-09 04:08:11 - app.main - INFO - Loaded model for site 4
+2025-12-09 04:08:11 - app.main - INFO - Loaded model for site 5
+2025-12-09 04:08:11 - app.main - INFO - Loaded model for site 6
+2025-12-09 04:08:11 - app.main - INFO - Loaded model for site 7
+2025-12-09 04:08:11 - app.main - INFO - Loaded unified model
+2025-12-09 04:08:11 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:00:25 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 05:00:27 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:00:27 - app.main - INFO - Loading models...
+2025-12-09 05:00:27 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:00:28 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:00:28 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:00:28 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:00:28 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:00:28 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:00:28 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:00:28 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:00:28 - app.main - INFO - Loaded unified model
+2025-12-09 05:00:28 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:10:44 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:10:44 - app.main - INFO - Loading models...
+2025-12-09 05:10:44 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:10:45 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:10:45 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:10:45 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:10:45 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:10:45 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:10:45 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:10:45 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:10:45 - app.main - INFO - Loaded unified model
+2025-12-09 05:10:45 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:13:35 - app.services.prediction_service - WARNING - Missing features: ['solar_declination_deg', 'hour_angle_deg', 'solar_time_hr', 'EoT_min', 'NO2_satellite_filled_smooth', 'HCHO_satellite_filled_smooth', 'ratio_satellite_smooth']
+2025-12-09 05:14:07 - app.services.prediction_service - WARNING - Missing features: ['solar_declination_deg', 'hour_angle_deg', 'solar_time_hr', 'EoT_min', 'NO2_satellite_filled_smooth', 'HCHO_satellite_filled_smooth', 'ratio_satellite_smooth']
+2025-12-09 05:14:20 - app.services.prediction_service - WARNING - Missing features: ['solar_declination_deg', 'hour_angle_deg', 'solar_time_hr', 'EoT_min', 'NO2_satellite_filled_smooth', 'HCHO_satellite_filled_smooth', 'ratio_satellite_smooth']
+2025-12-09 05:15:24 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 05:15:53 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:15:53 - app.main - INFO - Loading models...
+2025-12-09 05:15:53 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:15:53 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:15:53 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:15:53 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:15:53 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:15:53 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:15:53 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:15:53 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:15:53 - app.main - INFO - Loaded unified model
+2025-12-09 05:15:53 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:17:44 - app.services.prediction_service - WARNING - Missing features: ['solar_declination_deg', 'hour_angle_deg', 'solar_time_hr', 'EoT_min', 'NO2_satellite_filled_smooth', 'HCHO_satellite_filled_smooth', 'ratio_satellite_smooth']
+2025-12-09 05:17:45 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 05:17:46 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:17:46 - app.main - INFO - Loading models...
+2025-12-09 05:17:46 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:17:47 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:17:47 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:17:47 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:17:47 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:17:47 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:17:47 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:17:47 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:17:47 - app.main - INFO - Loaded unified model
+2025-12-09 05:17:47 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:17:48 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:17:48 - app.main - INFO - Loading models...
+2025-12-09 05:17:48 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:17:49 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:17:49 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:17:49 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:17:49 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:17:49 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:17:49 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:17:49 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:17:49 - app.main - INFO - Loaded unified model
+2025-12-09 05:17:49 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:22:48 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 05:22:50 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:22:50 - app.main - INFO - Loading models...
+2025-12-09 05:22:50 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:22:51 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:22:51 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:22:51 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:22:51 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:22:51 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:22:51 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:22:51 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:22:51 - app.main - INFO - Loaded unified model
+2025-12-09 05:22:51 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:22:52 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:22:52 - app.main - INFO - Loading models...
+2025-12-09 05:22:52 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:22:53 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:22:53 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:22:53 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:22:53 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:22:53 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:22:53 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:22:53 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:22:53 - app.main - INFO - Loaded unified model
+2025-12-09 05:22:53 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:43:22 - app.api.predict - INFO - Received CSV upload request for site 1, file: site_1_unseen_input_data_with_satellite.csv, size: 4385678
+2025-12-09 05:43:22 - app.api.predict - INFO - Reading CSV file content...
+2025-12-09 05:43:22 - app.api.predict - INFO - Read 4385678 bytes from CSV file
+2025-12-09 05:43:22 - app.api.predict - INFO - Parsing CSV content (4385678 characters)...
+2025-12-09 05:43:22 - app.api.predict - INFO - CSV parsed successfully: 10872 rows, 32 columns
+2025-12-09 05:43:23 - app.services.prediction_service - WARNING - Missing features: ['solar_declination_deg', 'hour_angle_deg', 'solar_time_hr', 'EoT_min', 'NO2_satellite_filled_smooth', 'HCHO_satellite_filled_smooth', 'ratio_satellite_smooth']
+2025-12-09 05:43:26 - app.api.predict - INFO - Received CSV upload request for site 1, file: site_1_unseen_input_data_with_satellite.csv, size: 4385678
+2025-12-09 05:43:26 - app.api.predict - INFO - Reading CSV file content...
+2025-12-09 05:43:26 - app.api.predict - INFO - Read 4385678 bytes from CSV file
+2025-12-09 05:43:26 - app.api.predict - INFO - Parsing CSV content (4385678 characters)...
+2025-12-09 05:43:26 - app.api.predict - INFO - CSV parsed successfully: 10872 rows, 32 columns
+2025-12-09 05:43:26 - app.services.prediction_service - WARNING - Missing features: ['solar_declination_deg', 'hour_angle_deg', 'solar_time_hr', 'EoT_min', 'NO2_satellite_filled_smooth', 'HCHO_satellite_filled_smooth', 'ratio_satellite_smooth']
+2025-12-09 05:43:28 - app.api.predict - INFO - Received CSV upload request for site 1, file: site_1_unseen_input_data_with_satellite.csv, size: 4385678
+2025-12-09 05:43:28 - app.api.predict - INFO - Reading CSV file content...
+2025-12-09 05:43:28 - app.api.predict - INFO - Read 4385678 bytes from CSV file
+2025-12-09 05:43:28 - app.api.predict - INFO - Parsing CSV content (4385678 characters)...
+2025-12-09 05:43:28 - app.api.predict - INFO - CSV parsed successfully: 10872 rows, 32 columns
+2025-12-09 05:43:28 - app.services.prediction_service - WARNING - Missing features: ['solar_declination_deg', 'hour_angle_deg', 'solar_time_hr', 'EoT_min', 'NO2_satellite_filled_smooth', 'HCHO_satellite_filled_smooth', 'ratio_satellite_smooth']
+2025-12-09 05:43:46 - app.api.predict - INFO - Received CSV upload request for site 1, file: site_1_unseen_input_data_with_satellite.csv, size: 4385678
+2025-12-09 05:43:46 - app.api.predict - INFO - Reading CSV file content...
+2025-12-09 05:43:46 - app.api.predict - INFO - Read 4385678 bytes from CSV file
+2025-12-09 05:43:46 - app.api.predict - INFO - Parsing CSV content (4385678 characters)...
+2025-12-09 05:43:46 - app.api.predict - INFO - CSV parsed successfully: 10872 rows, 32 columns
+2025-12-09 05:43:47 - app.services.prediction_service - WARNING - Missing features: ['solar_declination_deg', 'hour_angle_deg', 'solar_time_hr', 'EoT_min', 'NO2_satellite_filled_smooth', 'HCHO_satellite_filled_smooth', 'ratio_satellite_smooth']
+2025-12-09 05:43:51 - app.api.predict - INFO - Received CSV upload request for site 1, file: site_1_unseen_input_data_with_satellite.csv, size: 4385678
+2025-12-09 05:43:51 - app.api.predict - INFO - Reading CSV file content...
+2025-12-09 05:43:51 - app.api.predict - INFO - Read 4385678 bytes from CSV file
+2025-12-09 05:43:51 - app.api.predict - INFO - Parsing CSV content (4385678 characters)...
+2025-12-09 05:43:51 - app.api.predict - INFO - CSV parsed successfully: 10872 rows, 32 columns
+2025-12-09 05:43:51 - app.services.prediction_service - WARNING - Missing features: ['solar_declination_deg', 'hour_angle_deg', 'solar_time_hr', 'EoT_min', 'NO2_satellite_filled_smooth', 'HCHO_satellite_filled_smooth', 'ratio_satellite_smooth']
+2025-12-09 05:44:28 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 05:48:19 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:48:19 - app.main - INFO - Loading models...
+2025-12-09 05:48:19 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:48:20 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:48:20 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:48:20 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:48:20 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:48:20 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:48:20 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:48:20 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:48:20 - app.main - INFO - Loaded unified model
+2025-12-09 05:48:20 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:48:36 - app.api.predict - INFO - Received CSV upload request for site 1, file: site_1_unseen_input_data_with_satellite.csv, size: 4385678
+2025-12-09 05:48:36 - app.api.predict - INFO - Reading CSV file content...
+2025-12-09 05:48:36 - app.api.predict - INFO - Read 4385678 bytes from CSV file
+2025-12-09 05:48:36 - app.api.predict - INFO - Parsing CSV content (4385678 characters)...
+2025-12-09 05:48:36 - app.api.predict - INFO - CSV parsed successfully: 10872 rows, 32 columns
+2025-12-09 05:48:36 - app.services.prediction_service - WARNING - Missing features: ['solar_declination_deg', 'hour_angle_deg', 'solar_time_hr', 'EoT_min', 'NO2_satellite_filled_smooth', 'HCHO_satellite_filled_smooth', 'ratio_satellite_smooth']
+2025-12-09 05:50:46 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 05:50:47 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:50:47 - app.main - INFO - Loading models...
+2025-12-09 05:50:47 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:50:48 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:50:48 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:50:48 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:50:48 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:50:48 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:50:48 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:50:48 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:50:48 - app.main - INFO - Loaded unified model
+2025-12-09 05:50:48 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:50:49 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:50:49 - app.main - INFO - Loading models...
+2025-12-09 05:50:49 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:50:50 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:50:50 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:50:50 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:50:50 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:50:50 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:50:50 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:50:50 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:50:50 - app.main - INFO - Loaded unified model
+2025-12-09 05:50:50 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:51:40 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 05:51:42 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:51:42 - app.main - INFO - Loading models...
+2025-12-09 05:51:42 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:51:42 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:51:42 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:51:42 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:51:42 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:51:42 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:51:42 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:51:42 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:51:42 - app.main - INFO - Loaded unified model
+2025-12-09 05:51:42 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 05:51:44 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 05:51:44 - app.main - INFO - Loading models...
+2025-12-09 05:51:44 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 05:51:45 - app.main - INFO - Loaded model for site 1
+2025-12-09 05:51:45 - app.main - INFO - Loaded model for site 2
+2025-12-09 05:51:45 - app.main - INFO - Loaded model for site 3
+2025-12-09 05:51:45 - app.main - INFO - Loaded model for site 4
+2025-12-09 05:51:45 - app.main - INFO - Loaded model for site 5
+2025-12-09 05:51:45 - app.main - INFO - Loaded model for site 6
+2025-12-09 05:51:45 - app.main - INFO - Loaded model for site 7
+2025-12-09 05:51:45 - app.main - INFO - Loaded unified model
+2025-12-09 05:51:45 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 06:11:34 - app.main - INFO - Shutting down Air Pollution Forecasting API...
+2025-12-09 06:11:36 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 06:11:36 - app.main - INFO - Loading models...
+2025-12-09 06:11:36 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 06:11:37 - app.main - INFO - Loaded model for site 1
+2025-12-09 06:11:37 - app.main - INFO - Loaded model for site 2
+2025-12-09 06:11:37 - app.main - INFO - Loaded model for site 3
+2025-12-09 06:11:37 - app.main - INFO - Loaded model for site 4
+2025-12-09 06:11:37 - app.main - INFO - Loaded model for site 5
+2025-12-09 06:11:37 - app.main - INFO - Loaded model for site 6
+2025-12-09 06:11:37 - app.main - INFO - Loaded model for site 7
+2025-12-09 06:11:37 - app.main - INFO - Loaded unified model
+2025-12-09 06:11:37 - app.main - INFO - Successfully pre-loaded 8 model(s)
+2025-12-09 06:11:38 - app.main - INFO - Starting Air Pollution Forecasting API...
+2025-12-09 06:11:38 - app.main - INFO - Loading models...
+2025-12-09 06:11:38 - app.main - INFO - Pre-loading models (optional - will load on-demand if skipped)...
+2025-12-09 06:11:39 - app.main - INFO - Loaded model for site 1
+2025-12-09 06:11:39 - app.main - INFO - Loaded model for site 2
+2025-12-09 06:11:39 - app.main - INFO - Loaded model for site 3
+2025-12-09 06:11:39 - app.main - INFO - Loaded model for site 4
+2025-12-09 06:11:39 - app.main - INFO - Loaded model for site 5
+2025-12-09 06:11:39 - app.main - INFO - Loaded model for site 6
+2025-12-09 06:11:39 - app.main - INFO - Loaded model for site 7
+2025-12-09 06:11:39 - app.main - INFO - Loaded unified model
+2025-12-09 06:11:39 - app.main - INFO - Successfully pre-loaded 8 model(s)

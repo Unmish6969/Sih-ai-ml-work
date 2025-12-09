@@ -3,9 +3,8 @@
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { PredictResponse } from '@shared/api';
+import { PredictResponse, PredictInput } from '@shared/api';
 import apiClient from '@/services/apiClient';
-import { generateDummy24HourForecast } from '@/services/dummyData';
 import { RefreshCw, AlertCircle, Upload, CheckCircle } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import ForecastChart from '@/components/ForecastChart';
@@ -27,6 +26,10 @@ interface FormData {
   u_forecast: number;
   v_forecast: number;
   w_forecast: number;
+  blh_forecast: number;
+  NO2_satellite?: number;
+  HCHO_satellite?: number;
+  SZA_deg?: number;
 }
 
 const defaultFormData: FormData = {
@@ -41,6 +44,7 @@ const defaultFormData: FormData = {
   u_forecast: 1.5,
   v_forecast: -0.5,
   w_forecast: 0,
+  blh_forecast: 500,
 };
 
 export default function InteractiveForecastTool({
@@ -49,6 +53,7 @@ export default function InteractiveForecastTool({
 }: InteractiveForecastToolProps) {
   const { theme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadedFileRef = useRef<File | null>(null);
   const [formData, setFormData] = useState<FormData>(defaultFormData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,10 +63,20 @@ export default function InteractiveForecastTool({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : value,
-    }));
+    setFormData((prev) => {
+      const newData: any = { ...prev };
+      if (type === 'number') {
+        // For optional fields, allow empty values
+        if (value === '' && (name === 'NO2_satellite' || name === 'HCHO_satellite' || name === 'SZA_deg')) {
+          newData[name] = undefined;
+        } else {
+          newData[name] = parseFloat(value) || 0;
+        }
+      } else {
+        newData[name] = value;
+      }
+      return newData;
+    });
   };
 
   const parseCSVData = (csvContent: string): FormData[] | null => {
@@ -72,7 +87,7 @@ export default function InteractiveForecastTool({
       }
 
       const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
-      const requiredFields = ['year', 'month', 'day', 'hour', 'o3_forecast', 'no2_forecast', 't_forecast', 'q_forecast', 'u_forecast', 'v_forecast', 'w_forecast'];
+      const requiredFields = ['year', 'month', 'day', 'hour'];
       const missingFields = requiredFields.filter((field) => !headers.includes(field));
 
       if (missingFields.length > 0) {
@@ -82,11 +97,14 @@ export default function InteractiveForecastTool({
       const parsedData: FormData[] = [];
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(',').map((v) => v.trim());
-        if (values.some((v) => v === '')) continue;
+        if (values.some((v, idx) => idx < 4 && v === '')) continue; // Skip if required fields are empty
 
         const row: Record<string, any> = {};
         headers.forEach((header, index) => {
-          row[header] = isNaN(parseFloat(values[index])) ? values[index] : parseFloat(values[index]);
+          const value = values[index];
+          row[header] = value === '' || value === null || value === undefined 
+            ? null 
+            : (isNaN(parseFloat(value)) ? value : parseFloat(value));
         });
 
         parsedData.push({
@@ -94,13 +112,17 @@ export default function InteractiveForecastTool({
           month: row.month || defaultFormData.month,
           day: row.day || defaultFormData.day,
           hour: row.hour || defaultFormData.hour,
-          O3_forecast: row.o3_forecast || defaultFormData.O3_forecast,
-          NO2_forecast: row.no2_forecast || defaultFormData.NO2_forecast,
-          T_forecast: row.t_forecast || defaultFormData.T_forecast,
-          q_forecast: row.q_forecast || defaultFormData.q_forecast,
-          u_forecast: row.u_forecast || defaultFormData.u_forecast,
-          v_forecast: row.v_forecast || defaultFormData.v_forecast,
-          w_forecast: row.w_forecast || defaultFormData.w_forecast,
+          O3_forecast: row.o3_forecast ?? defaultFormData.O3_forecast,
+          NO2_forecast: row.no2_forecast ?? defaultFormData.NO2_forecast,
+          T_forecast: row.t_forecast ?? defaultFormData.T_forecast,
+          q_forecast: row.q_forecast ?? defaultFormData.q_forecast,
+          u_forecast: row.u_forecast ?? defaultFormData.u_forecast,
+          v_forecast: row.v_forecast ?? defaultFormData.v_forecast,
+          w_forecast: row.w_forecast ?? defaultFormData.w_forecast,
+          blh_forecast: row.blh_forecast ?? defaultFormData.blh_forecast,
+          NO2_satellite: row.no2_satellite,
+          HCHO_satellite: row.hcho_satellite,
+          SZA_deg: row.sza_deg,
         });
       }
 
@@ -116,7 +138,7 @@ export default function InteractiveForecastTool({
     }
   };
 
-  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCSVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -125,24 +147,134 @@ export default function InteractiveForecastTool({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      const parsed = parseCSVData(content);
-      if (parsed) {
-        setCsvData(parsed);
-        setCsvError(null);
-        setFormData(parsed[0]);
+    setLoading(true);
+    setCsvError(null);
+    setError(null);
+    setForecastResult(null);
+
+    try {
+      // Read file content for validation and preview
+      const reader = new FileReader();
+      
+      // Use a promise to handle the async FileReader
+      const fileContentPromise = new Promise<string>((resolve, reject) => {
+        reader.onload = (event) => {
+          try {
+            const content = event.target?.result as string;
+            resolve(content);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => {
+          reject(new Error('Failed to read file'));
+        };
+        reader.readAsText(file);
+      });
+
+      // Wait for file content
+      const fileContent = await fileContentPromise;
+      
+      // Parse CSV for validation and preview
+      const parsed = parseCSVData(fileContent);
+      if (!parsed) {
+        throw new Error('Failed to parse CSV data');
       }
-    };
-    reader.onerror = () => {
-      setCsvError('Failed to read file');
-    };
-    reader.readAsText(file);
+      
+      // Update UI with parsed data
+      setCsvData(parsed);
+      setFormData(parsed[0]);
+      
+      // Store the original file reference for potential retry
+      uploadedFileRef.current = file;
+      
+      // Only pass forecast_hours if <= 48, otherwise let backend process all rows
+      const forecastHours = parsed.length <= 48 ? parsed.length : undefined;
+      
+      console.log(`Uploading CSV file "${file.name}" with ${parsed.length} rows to site ${siteId}...`);
+      console.log('File size:', file.size, 'bytes');
+      console.log('API Base URL:', import.meta.env.VITE_API_URL || 'http://localhost:8000');
+      
+      try {
+        // Send the original file directly to the API
+        // The backend will handle parsing
+        const result = await apiClient.predictFromCSV(siteId, file, forecastHours);
+        
+        console.log('CSV prediction result:', result);
+        console.log(`Received ${result.predictions?.length || 0} predictions`);
+        
+        if (result.success) {
+          setForecastResult(result);
+          onForecastGenerated(result);
+          setCsvError(null);
+          setError(null);
+        } else {
+          throw new Error(result.message || 'Prediction failed');
+        }
+      } catch (apiErr: any) {
+        console.error('API call error:', apiErr);
+        console.error('Error details:', {
+          message: apiErr?.message,
+          status: apiErr?.status,
+          stack: apiErr?.stack
+        });
+        throw apiErr; // Re-throw to be caught by outer catch
+      }
+      
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Failed to process CSV file';
+      console.error('Error in handleCSVUpload:', err);
+      setCsvError(errorMessage);
+      setError(errorMessage);
+      
+      // Show more detailed error in console for debugging
+      if (err?.status) {
+        console.error(`HTTP Status: ${err.status}`);
+      }
+      if (err?.response) {
+        console.error('Response:', err.response);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLoadFromCSV = () => {
     fileInputRef.current?.click();
+  };
+
+  const generate24HourInputData = (baseData: FormData): PredictInput[] => {
+    const inputData: PredictInput[] = [];
+    const baseDate = new Date(baseData.year, baseData.month - 1, baseData.day, baseData.hour);
+    
+    for (let i = 0; i < 24; i++) {
+      const forecastDate = new Date(baseDate);
+      forecastDate.setHours(baseDate.getHours() + i);
+      
+      const input: PredictInput = {
+        year: forecastDate.getFullYear(),
+        month: forecastDate.getMonth() + 1,
+        day: forecastDate.getDate(),
+        hour: forecastDate.getHours(),
+        O3_forecast: baseData.O3_forecast,
+        NO2_forecast: baseData.NO2_forecast,
+        T_forecast: baseData.T_forecast,
+        q_forecast: baseData.q_forecast,
+        u_forecast: baseData.u_forecast,
+        v_forecast: baseData.v_forecast,
+        w_forecast: baseData.w_forecast,
+        blh_forecast: baseData.blh_forecast,
+      };
+      
+      // Add optional fields if provided
+      if (baseData.NO2_satellite !== undefined) input.NO2_satellite = baseData.NO2_satellite;
+      if (baseData.HCHO_satellite !== undefined) input.HCHO_satellite = baseData.HCHO_satellite;
+      if (baseData.SZA_deg !== undefined) input.SZA_deg = baseData.SZA_deg;
+      
+      inputData.push(input);
+    }
+    
+    return inputData;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -151,12 +283,43 @@ export default function InteractiveForecastTool({
     setError(null);
 
     try {
-      // Use dummy data for now
-      const result = generateDummy24HourForecast(siteId);
+      let inputData: PredictInput[];
+      
+      // If CSV data is loaded, use it; otherwise generate 24-hour forecast from form data
+      if (csvData && csvData.length > 0) {
+        inputData = csvData.map((row) => ({
+          year: row.year,
+          month: row.month,
+          day: row.day,
+          hour: row.hour,
+          O3_forecast: row.O3_forecast,
+          NO2_forecast: row.NO2_forecast,
+          T_forecast: row.T_forecast,
+          q_forecast: row.q_forecast,
+          u_forecast: row.u_forecast,
+          v_forecast: row.v_forecast,
+          w_forecast: row.w_forecast,
+          blh_forecast: row.blh_forecast,
+          NO2_satellite: row.NO2_satellite,
+          HCHO_satellite: row.HCHO_satellite,
+          SZA_deg: row.SZA_deg,
+        }));
+      } else {
+        // Generate 24-hour forecast from single input
+        inputData = generate24HourInputData(formData);
+      }
+
+      const request = {
+        input_data: inputData,
+        site_id: siteId,
+        forecast_hours: inputData.length,
+      };
+
+      const result = await apiClient.predictSite(siteId, request);
       setForecastResult(result);
       onForecastGenerated(result);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate forecast';
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Failed to generate forecast';
       setError(errorMessage);
       console.error('Error generating forecast:', err);
     } finally {
@@ -210,20 +373,47 @@ export default function InteractiveForecastTool({
               Load from CSV
             </Button>
             {csvData && (
-              <Button
-                type="button"
-                onClick={() => {
-                  setCsvData(null);
-                  setFormData(defaultFormData);
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                  }
-                }}
-                variant="outline"
-                className={`${theme === 'dark' ? 'border-slate-600 text-slate-200 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
-              >
-                Clear CSV
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    if (!uploadedFileRef.current) return;
+                    setLoading(true);
+                    setError(null);
+                    try {
+                      const forecastHours = csvData.length <= 48 ? csvData.length : undefined;
+                      const result = await apiClient.predictFromCSV(siteId, uploadedFileRef.current, forecastHours);
+                      setForecastResult(result);
+                      onForecastGenerated(result);
+                    } catch (err: any) {
+                      setError(err?.message || 'Failed to process CSV');
+                      console.error('Error processing CSV manually:', err);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading || !uploadedFileRef.current}
+                  className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white border-0"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  Process CSV
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setCsvData(null);
+                    setFormData(defaultFormData);
+                    uploadedFileRef.current = null;
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}
+                  variant="outline"
+                  className={`${theme === 'dark' ? 'border-slate-600 text-slate-200 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
+                >
+                  Clear CSV
+                </Button>
+              </>
             )}
           </div>
 
@@ -241,7 +431,18 @@ export default function InteractiveForecastTool({
             <div className={`p-4 rounded-lg border ${theme === 'dark' ? 'bg-blue-900/20 border-blue-700' : 'bg-blue-50 border-blue-300'}`}>
               <p className={`text-sm ${theme === 'dark' ? 'text-blue-200' : 'text-blue-700'}`}>
                 <span className="font-semibold">CSV Data Loaded:</span> {csvData.length} rows ready for processing
+                {loading && (
+                  <span className="ml-2 inline-flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    Processing...
+                  </span>
+                )}
               </p>
+              {!loading && !forecastResult && (
+                <p className={`text-xs mt-2 ${theme === 'dark' ? 'text-blue-300' : 'text-blue-600'}`}>
+                  Predictions should generate automatically. If not, click "Generate Forecast" below.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -413,6 +614,77 @@ export default function InteractiveForecastTool({
                   onChange={handleInputChange}
                   step="0.01"
                   className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${theme === 'dark' ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-slate-50 text-slate-900'}`}
+                />
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Boundary Layer Height (m) <span className="text-xs text-cyan-600">*Recommended</span>
+                </label>
+                <input
+                  type="number"
+                  name="blh_forecast"
+                  value={formData.blh_forecast}
+                  onChange={handleInputChange}
+                  step="0.01"
+                  className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${theme === 'dark' ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-slate-50 text-slate-900'}`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Optional Fields Section */}
+          <div>
+            <h4 className={`font-semibold mb-4 text-sm ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              Optional Fields
+              <span className={`text-xs font-normal ml-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                (Auto-computed if not provided)
+              </span>
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                  NO₂ Satellite (one value per day)
+                </label>
+                <input
+                  type="number"
+                  name="NO2_satellite"
+                  value={formData.NO2_satellite || ''}
+                  onChange={handleInputChange}
+                  step="0.01"
+                  placeholder="Optional"
+                  className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${theme === 'dark' ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-slate-50 text-slate-900'}`}
+                />
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                  HCHO Satellite (one value per day)
+                </label>
+                <input
+                  type="number"
+                  name="HCHO_satellite"
+                  value={formData.HCHO_satellite || ''}
+                  onChange={handleInputChange}
+                  step="0.01"
+                  placeholder="Optional"
+                  className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${theme === 'dark' ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-slate-50 text-slate-900'}`}
+                />
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                  SZA (Solar Zenith Angle, degrees)
+                  <span className={`text-xs block mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Auto-computed from site coordinates
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  name="SZA_deg"
+                  value={formData.SZA_deg || ''}
+                  onChange={handleInputChange}
+                  step="0.01"
+                  placeholder="Auto-computed"
+                  disabled
+                  className={`w-full px-3 py-2 rounded-lg border ${theme === 'dark' ? 'border-slate-600 bg-slate-800 text-slate-400 cursor-not-allowed' : 'border-slate-300 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
                 />
               </div>
             </div>

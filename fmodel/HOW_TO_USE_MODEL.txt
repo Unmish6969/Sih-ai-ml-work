@@ -1,0 +1,529 @@
+================================================================================
+HOW TO USE TRAINED XGBOOST MODELS FOR PREDICTION
+================================================================================
+
+This guide explains how to use the trained .pkl model files to make predictions
+on new unseen data. The input CSV format should match:
+Data_SIH_2025_with_blh/Data_SIH_2025_with_blh/site_1_unseen_input_data.csv
+
+================================================================================
+STEP 1: LOAD YOUR INPUT CSV FILE
+================================================================================
+
+Your input CSV should have these columns:
+- year, month, day, hour
+- O3_forecast, NO2_forecast
+- T_forecast, q_forecast
+- u_forecast, v_forecast, w_forecast
+- blh_forecast
+- NO2_satellite, HCHO_satellite, ratio_satellite (one value per day, many empty)
+
+Example code:
+    import pandas as pd
+    df = pd.read_csv("site_1_unseen_input_data.csv")
+    
+    # Ensure data is sorted by temporal order
+    df = df.sort_values(by=['year', 'month', 'day', 'hour']).reset_index(drop=True)
+
+
+================================================================================
+STEP 2: FILL SATELLITE DATA (ONE VALUE PER DAY → ALL HOURS)
+================================================================================
+
+Satellite data comes with only ONE value per day. We need to:
+1. Impute missing daily values by averaging previous/next day
+2. Fill all hours of each day using forecast normalization
+
+IMPORTANT: This step creates NO2_satellite_filled, HCHO_satellite_filled, and 
+ratio_satellite columns that are used in feature engineering.
+
+Code:
+    import pandas as pd
+    import numpy as np
+    
+    def impute_daily_value(df, column):
+        """Impute missing full-day satellite values by averaging previous/next day."""
+        ordered = df.sort_values(["year", "month", "day", "hour"]).reset_index()
+        
+        # Get first non-null value for each day
+        daily_first = (
+            ordered.groupby(["year", "month", "day"])[column]
+            .apply(lambda s: s.dropna().iloc[0] if not s.dropna().empty else pd.NA)
+        )
+        
+        day_keys = list(daily_first.index)
+        filled_values = {}
+        
+        for i, key in enumerate(day_keys):
+            if pd.notna(daily_first.loc[key]):
+                continue
+            
+            prev_val = None
+            next_val = None
+            
+            # Look backward
+            for j in range(i - 1, -1, -1):
+                candidate = daily_first.iloc[j]
+                if pd.notna(candidate):
+                    prev_val = float(candidate)
+                    break
+            
+            # Look forward
+            for j in range(i + 1, len(day_keys)):
+                candidate = daily_first.iloc[j]
+                if pd.notna(candidate):
+                    next_val = float(candidate)
+                    break
+            
+            if prev_val is not None and next_val is not None:
+                filled_values[key] = (prev_val + next_val) / 2.0
+        
+        # Assign imputed value to first row of each missing day
+        for key, value in filled_values.items():
+            mask = (
+                (ordered["year"] == key[0]) &
+                (ordered["month"] == key[1]) &
+                (ordered["day"] == key[2])
+            )
+            if mask.any():
+                first_idx = ordered.index[mask][0]
+                ordered.loc[first_idx, column] = value
+        
+        return ordered.set_index("index").sort_index()
+    
+    def fill_from_forecast(df, forecast_col, sat_col, out_col):
+        """Normalize forecast by daily max and scale by daily satellite value."""
+        filled = df.copy()
+        
+        def _fill_group(group):
+            max_forecast = group[forecast_col].max(skipna=True)
+            sat_values = group[sat_col].dropna().unique()
+            sat_value = sat_values[0] if len(sat_values) else None
+            
+            if sat_value is None or pd.isna(max_forecast) or max_forecast <= 0:
+                group[out_col] = pd.NA
+                return group
+            
+            normalized = group[forecast_col] / max_forecast
+            group[out_col] = normalized * sat_value
+            return group
+        
+        filled = filled.groupby(["year", "month", "day"], group_keys=False).apply(_fill_group)
+        return filled
+    
+    # Step 2.1: Impute missing daily satellite values
+    df = impute_daily_value(df, "NO2_satellite")
+    df = impute_daily_value(df, "HCHO_satellite")
+    
+    # Step 2.2: Fill per-hour satellite series from forecasts
+    df = fill_from_forecast(df, "NO2_forecast", "NO2_satellite", "NO2_satellite_filled")
+    df = fill_from_forecast(df, "O3_forecast", "HCHO_satellite", "HCHO_satellite_filled")
+    
+    # Step 2.3: Recompute ratio_satellite
+    def _compute_ratio(row):
+        no2 = row.get("NO2_satellite_filled")
+        hcho = row.get("HCHO_satellite_filled")
+        if pd.isna(no2) or pd.isna(hcho) or no2 == 0:
+            return pd.NA
+        return hcho / no2
+    
+    df["ratio_satellite"] = df.apply(_compute_ratio, axis=1)
+    
+    # Drop raw satellite columns (we use filled versions)
+    df = df.drop(columns=["NO2_satellite", "HCHO_satellite"], errors="ignore")
+
+
+================================================================================
+STEP 3: ADD DERIVED FEATURES (Same as training)
+================================================================================
+
+Add all the features that were used during training:
+
+3.1: Add derived forecast features (if not already present):
+    df['NO2_forecast_per_blh'] = df['NO2_forecast'] / (df['blh_forecast'] + 1e-6)
+    df['O3_forecast_per_blh'] = df['O3_forecast'] / (df['blh_forecast'] + 1e-6)
+    df['blh_delta_1h'] = df['blh_forecast'].diff()
+    df['blh_rel_change'] = df['blh_forecast'].pct_change()
+    
+    # Wind features
+    df['wind_speed'] = np.sqrt(df['u_forecast']**2 + df['v_forecast']**2)
+    df['wind_dir_deg'] = np.degrees(np.arctan2(df['v_forecast'], df['u_forecast'])) % 360
+    
+    # Wind sector (0-7)
+    df['wind_sector'] = (df['wind_dir_deg'] / 45).astype(int) % 8
+    
+    # Solar features (if not present)
+    if 'sin_hour' not in df.columns:
+        df['sin_hour'] = np.sin(2 * np.pi * df['hour'] / 24)
+        df['cos_hour'] = np.cos(2 * np.pi * df['hour'] / 24)
+    
+    # SZA, solar elevation, etc. (if available in your data)
+
+
+================================================================================
+STEP 4: FEATURE ENGINEERING (MUST MATCH TRAINING PIPELINE)
+================================================================================
+
+IMPORTANT: The feature engineering MUST match exactly what was done during training.
+
+4.1: SMOOTH SATELLITE DATA (Drop raw, use smooth)
+    satellite_cols = ['NO2_satellite_filled', 'HCHO_satellite_filled', 'ratio_satellite']
+    
+    for col in satellite_cols:
+        if col in df.columns:
+            # Apply rolling mean with window=3, min_periods=1
+            df[f'{col}_smooth'] = df[col].rolling(window=3, min_periods=1, center=True).mean()
+            # Drop the original raw column
+            df = df.drop(col, axis=1)
+
+4.2: ADD TEMPORAL FEATURES
+    # Create datetime
+    df['datetime'] = pd.to_datetime(
+        df[['year', 'month', 'day']].astype(int).astype(str).agg('-'.join, axis=1) + 
+        ' ' + df['hour'].astype(int).astype(str) + ':00:00',
+        errors='coerce'
+    )
+    
+    # Day of week (0=Monday, 6=Sunday)
+    df['dayofweek'] = df['datetime'].dt.dayofweek
+    
+    # Season (1=Spring, 2=Summer, 3=Fall, 4=Winter)
+    df['season'] = df['datetime'].dt.month % 12 // 3 + 1
+    
+    # Is weekend
+    df['is_weekend'] = (df['dayofweek'] >= 5).astype(int)
+    
+    # Sin/Cos encoding for hour
+    df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
+    df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
+    
+    # Sin/Cos encoding for month
+    df['month_sin'] = np.sin(2 * np.pi * df['month'] / 12)
+    df['month_cos'] = np.cos(2 * np.pi * df['month'] / 12)
+    
+    # Drop datetime
+    df = df.drop('datetime', axis=1)
+
+4.3: ADD LAG FEATURES (CRITICAL - Use iterative prediction approach)
+    
+    IMPORTANT: For prediction, we don't have O3_target and NO2_target yet.
+    We need to use an ITERATIVE approach:
+    
+    Option A: Use forecast values as proxy (for first predictions)
+        # Initialize lag features using forecasts as proxy
+        lag_periods = [1, 2, 3, 6, 12]
+        for lag in lag_periods:
+            df[f'NO2_target_lag{lag}'] = df['NO2_forecast'].shift(lag)
+            df[f'O3_target_lag{lag}'] = df['O3_forecast'].shift(lag)
+    
+    Option B: Iterative prediction (RECOMMENDED for accuracy)
+        # Make predictions row by row, using previous predictions as lag features
+        # This is more accurate but slower
+        
+        predictions_o3 = []
+        predictions_no2 = []
+        
+        for idx in range(len(df)):
+            # Prepare features for this row
+            # Use previous predictions for lag features
+            if idx >= 12:
+                for lag in [1, 2, 3, 6, 12]:
+                    df.loc[idx, f'NO2_target_lag{lag}'] = predictions_no2[idx - lag] if idx >= lag else df.loc[idx - lag, 'NO2_forecast']
+                    df.loc[idx, f'O3_target_lag{lag}'] = predictions_o3[idx - lag] if idx >= lag else df.loc[idx - lag, 'O3_forecast']
+            else:
+                # For first 12 rows, use forecasts
+                for lag in [1, 2, 3, 6, 12]:
+                    if idx >= lag:
+                        df.loc[idx, f'NO2_target_lag{lag}'] = df.loc[idx - lag, 'NO2_forecast']
+                        df.loc[idx, f'O3_target_lag{lag}'] = df.loc[idx - lag, 'O3_forecast']
+            
+            # Prepare features and predict
+            # ... (see full code below)
+
+4.4: ADD ROLLING WINDOW FEATURES
+    
+    # For prediction, we can use forecasts for rolling features initially
+    # Then update with predictions as we iterate
+    
+    # Rolling features for NO2 (use forecast initially)
+    for window in [3, 6, 12]:
+        df[f'NO2_roll{window}'] = df['NO2_forecast'].rolling(window=window, min_periods=1).mean()
+    
+    # Rolling features for O3 (use forecast initially)
+    for window in [3, 6, 12]:
+        df[f'O3_roll{window}'] = df['O3_forecast'].rolling(window=window, min_periods=1).mean()
+    
+    # Rolling features for temperature
+    if 'T_forecast' in df.columns:
+        df['temp_roll3'] = df['T_forecast'].rolling(window=3, min_periods=1).mean()
+    
+    # Rolling features for relative humidity
+    if 'q_forecast' in df.columns:
+        df['rh_roll3'] = df['q_forecast'].rolling(window=3, min_periods=1).mean()
+    
+    # Rolling features for wind speed
+    if 'wind_speed' in df.columns:
+        df['ws_roll3'] = df['wind_speed'].rolling(window=3, min_periods=1).mean()
+
+
+================================================================================
+STEP 5: PREPARE FEATURES FOR MODEL
+================================================================================
+
+5.1: Get feature list from model metadata
+    import json
+    
+    # Load metadata to get exact feature list
+    metadata_path = "models/xgboost_per_site/site_1/metadata_YYYYMMDD_HHMMSS.json"
+    with open(metadata_path, 'r') as f:
+        metadata = json.load(f)
+    
+    feature_cols = metadata['features']  # This is the exact list used during training
+
+5.2: Select and align features
+    # Check for missing features
+    missing_features = [f for f in feature_cols if f not in df.columns]
+    if missing_features:
+        print(f"Warning: Missing features: {missing_features}")
+        # Add missing features with NaN (will be filled with median)
+        for f in missing_features:
+            df[f] = np.nan
+    
+    # Select only the features used in training
+    X = df[feature_cols].copy()
+    
+    # Handle missing values (use median from training if available, else compute)
+    X = X.fillna(X.median())
+    
+    # Check for infinite values
+    X = X.replace([np.inf, -np.inf], np.nan)
+    X = X.fillna(X.median())
+
+
+================================================================================
+STEP 6: LOAD MODEL AND MAKE PREDICTIONS
+================================================================================
+
+6.1: Load the trained models
+    import joblib
+    
+    site_id = 1  # Change for your site
+    model_dir = "models/xgboost_per_site"
+    
+    # Find latest models (or use specific timestamp)
+    import glob
+    import os
+    
+    site_dir = os.path.join(model_dir, f"site_{site_id}")
+    o3_models = glob.glob(os.path.join(site_dir, "O3_model_*.pkl"))
+    no2_models = glob.glob(os.path.join(site_dir, "NO2_model_*.pkl"))
+    
+    o3_model_path = max(o3_models, key=os.path.getctime)  # Latest model
+    no2_model_path = max(no2_models, key=os.path.getctime)
+    
+    # Load models
+    o3_model = joblib.load(o3_model_path)
+    no2_model = joblib.load(no2_model_path)
+
+6.2: Make predictions
+    # Predict O3
+    o3_predictions = o3_model.predict(X)
+    
+    # Predict NO2
+    no2_predictions = no2_model.predict(X)
+    
+    # Create output dataframe
+    output_df = df[['year', 'month', 'day', 'hour']].copy()
+    output_df['O3_predicted'] = o3_predictions
+    output_df['NO2_predicted'] = no2_predictions
+    
+    # Save predictions
+    output_df.to_csv("predictions.csv", index=False)
+
+
+================================================================================
+STEP 7: COMPLETE EXAMPLE CODE (Simplified - Using Forecasts for Lags)
+================================================================================
+
+import pandas as pd
+import numpy as np
+import joblib
+import json
+import glob
+import os
+
+def prepare_unseen_data_for_prediction(csv_path, site_id, model_dir):
+    """
+    Complete pipeline to prepare unseen data for prediction.
+    Uses forecasts as proxy for lag features (simpler but less accurate).
+    """
+    # Step 1: Load data
+    df = pd.read_csv(csv_path)
+    df = df.sort_values(by=['year', 'month', 'day', 'hour']).reset_index(drop=True)
+    
+    # Step 2: Fill satellite data (use functions from Step 2 above)
+    # ... (include impute_daily_value and fill_from_forecast functions)
+    
+    # Step 3: Add derived features
+    df['NO2_forecast_per_blh'] = df['NO2_forecast'] / (df['blh_forecast'] + 1e-6)
+    df['O3_forecast_per_blh'] = df['O3_forecast'] / (df['blh_forecast'] + 1e-6)
+    df['blh_delta_1h'] = df['blh_forecast'].diff()
+    df['blh_rel_change'] = df['blh_forecast'].pct_change()
+    df['wind_speed'] = np.sqrt(df['u_forecast']**2 + df['v_forecast']**2)
+    df['wind_dir_deg'] = np.degrees(np.arctan2(df['v_forecast'], df['u_forecast'])) % 360
+    df['wind_sector'] = (df['wind_dir_deg'] / 45).astype(int) % 8
+    
+    # Step 4: Feature engineering
+    # 4.1: Smooth satellite data
+    satellite_cols = ['NO2_satellite_filled', 'HCHO_satellite_filled', 'ratio_satellite']
+    for col in satellite_cols:
+        if col in df.columns:
+            df[f'{col}_smooth'] = df[col].rolling(window=3, min_periods=1, center=True).mean()
+            df = df.drop(col, axis=1)
+    
+    # 4.2: Add temporal features
+    df['datetime'] = pd.to_datetime(
+        df[['year', 'month', 'day']].astype(int).astype(str).agg('-'.join, axis=1) + 
+        ' ' + df['hour'].astype(int).astype(str) + ':00:00',
+        errors='coerce'
+    )
+    df['dayofweek'] = df['datetime'].dt.dayofweek
+    df['season'] = df['datetime'].dt.month % 12 // 3 + 1
+    df['is_weekend'] = (df['dayofweek'] >= 5).astype(int)
+    df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
+    df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
+    df['month_sin'] = np.sin(2 * np.pi * df['month'] / 12)
+    df['month_cos'] = np.cos(2 * np.pi * df['month'] / 12)
+    df = df.drop('datetime', axis=1)
+    
+    # 4.3: Add lag features (using forecasts as proxy)
+    lag_periods = [1, 2, 3, 6, 12]
+    for lag in lag_periods:
+        df[f'NO2_target_lag{lag}'] = df['NO2_forecast'].shift(lag)
+        df[f'O3_target_lag{lag}'] = df['O3_forecast'].shift(lag)
+    
+    # 4.4: Add rolling window features
+    for window in [3, 6, 12]:
+        df[f'NO2_roll{window}'] = df['NO2_forecast'].rolling(window=window, min_periods=1).mean()
+        df[f'O3_roll{window}'] = df['O3_forecast'].rolling(window=window, min_periods=1).mean()
+    
+    if 'T_forecast' in df.columns:
+        df['temp_roll3'] = df['T_forecast'].rolling(window=3, min_periods=1).mean()
+    if 'q_forecast' in df.columns:
+        df['rh_roll3'] = df['q_forecast'].rolling(window=3, min_periods=1).mean()
+    if 'wind_speed' in df.columns:
+        df['ws_roll3'] = df['wind_speed'].rolling(window=3, min_periods=1).mean()
+    
+    # Step 5: Load metadata to get feature list
+    site_dir = os.path.join(model_dir, f"site_{site_id}")
+    metadata_files = glob.glob(os.path.join(site_dir, "metadata_*.json"))
+    if metadata_files:
+        metadata_path = max(metadata_files, key=os.path.getctime)
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
+        feature_cols = metadata['features']
+    else:
+        # Fallback: infer features
+        EXCLUDE_FEATURES = ['O3_target', 'NO2_target', 'site_id']
+        feature_cols = [col for col in df.columns if col not in EXCLUDE_FEATURES]
+    
+    # Step 6: Prepare features
+    missing_features = [f for f in feature_cols if f not in df.columns]
+    if missing_features:
+        print(f"Warning: Missing features: {missing_features}")
+        for f in missing_features:
+            df[f] = np.nan
+    
+    X = df[feature_cols].copy()
+    X = X.fillna(X.median())
+    X = X.replace([np.inf, -np.inf], np.nan)
+    X = X.fillna(X.median())
+    
+    return X, feature_cols
+
+# Main prediction function
+def predict_unseen_data(csv_path, site_id, model_dir, output_path):
+    """Complete prediction pipeline."""
+    # Prepare features
+    X, feature_cols = prepare_unseen_data_for_prediction(csv_path, site_id, model_dir)
+    
+    # Load models
+    site_dir = os.path.join(model_dir, f"site_{site_id}")
+    o3_models = glob.glob(os.path.join(site_dir, "O3_model_*.pkl"))
+    no2_models = glob.glob(os.path.join(site_dir, "NO2_model_*.pkl"))
+    
+    o3_model = joblib.load(max(o3_models, key=os.path.getctime))
+    no2_model = joblib.load(max(no2_models, key=os.path.getctime))
+    
+    # Make predictions
+    o3_predictions = o3_model.predict(X)
+    no2_predictions = no2_model.predict(X)
+    
+    # Create output
+    df = pd.read_csv(csv_path)
+    output_df = df[['year', 'month', 'day', 'hour']].copy()
+    output_df['O3_predicted'] = o3_predictions
+    output_df['NO2_predicted'] = no2_predictions
+    
+    output_df.to_csv(output_path, index=False)
+    print(f"Predictions saved to: {output_path}")
+    
+    return output_df
+
+# Usage:
+# predictions = predict_unseen_data(
+#     csv_path="site_1_unseen_input_data.csv",
+#     site_id=1,
+#     model_dir="models/xgboost_per_site",
+#     output_path="predictions.csv"
+# )
+
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+1. FEATURE ORDER MATTERS: The features must be in the same order as during training.
+   Always use the feature list from metadata.json.
+
+2. SATELLITE DATA: Remember that satellite data comes with only ONE value per day.
+   You MUST fill it for all hours using the forecast normalization method.
+
+3. LAG FEATURES: For the most accurate predictions, use iterative prediction where
+   you use previous predictions as lag features. The simplified version uses
+   forecasts as proxy, which is less accurate but faster.
+
+4. MISSING VALUES: Always handle missing values the same way as training (median
+   imputation).
+
+5. TEMPORAL ORDER: Data MUST be sorted by year, month, day, hour before processing.
+
+6. MODEL VERSION: Always use the latest model or specify the exact timestamp if
+   you need reproducibility.
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Problem: "Missing features" error
+Solution: Check metadata.json to see exact feature list. Make sure all feature
+          engineering steps are applied correctly.
+
+Problem: Predictions seem wrong
+Solution: 
+  - Verify satellite data is filled correctly
+  - Check that lag features are created properly
+  - Ensure data is sorted by temporal order
+  - Verify feature order matches training
+
+Problem: Model file not found
+Solution: Check the model directory path and site_id. Use glob to find available
+          models.
+
+================================================================================
+END OF GUIDE
+================================================================================
+
+
+
+
